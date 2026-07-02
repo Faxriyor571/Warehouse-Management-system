@@ -1,0 +1,59 @@
+"""Enumerations used across the domain models.
+
+Using ``str, Enum`` makes the values human-readable in the database and JSON,
+while still being type-safe in Python.
+"""
+from __future__ import annotations
+
+import enum
+
+
+class RoleName(str, enum.Enum):
+    """Built-in system roles."""
+
+    ADMIN = "admin"
+    MANAGER = "manager"
+    WAREHOUSE_WORKER = "warehouse_worker"
+    CASHIER = "cashier"
+    VIEWER = "viewer"
+
+
+class PaymentMethodType(str, enum.Enum):
+    """Types of payment methods supported by the system."""
+
+    CASH = "cash"          # Naqd
+    CLICK = "click"        # Click
+    PAYME = "payme"        # Payme
+    BANK = "bank"          # Bank
+    DEBT = "debt"          # Qarz
+
+
+class PaymentStatus(str, enum.Enum):
+    """Payment status of a sale (chiqim)."""
+
+    PAID = "paid"          # To'liq to'langan
+    PARTIAL = "partial"    # Qisman to'langan
+    UNPAID = "unpaid"      # To'lanmagan (qarz)
+
+
+class DebtStatus(str, enum.Enum):
+    """Lifecycle status of a debt (qarz)."""
+
+    ACTIVE = "active"      # Faol (to'lanmoqda)
+    PAID = "paid"          # To'liq yopilgan
+    OVERDUE = "overdue"    # Muddati o'tgan
+
+
+class AuditAction(str, enum.Enum):
+    """Actions recorded in the audit log."""
+
+    LOGIN = "login"
+    LOGOUT = "logout"
+    CREATE = "create"
+    UPDATE = "update"
+    DELETE = "delete"
+    STOCK_IN = "stock_in"
+    STOCK_OUT = "stock_out"
+    PAYMENT = "payment"
+    PRICE_CHANGE = "price_change"
+    LOGIN_FAILED = "login_failed"
