@@ -73,12 +73,14 @@ docker compose up -d
 
 Yoki mahalliy PostgreSQL da `wms_db` bazasini va `wms_user` foydalanuvchisini yarating.
 
-### 4. Migratsiya
+### 4. Migratsiya (ixtiyoriy)
+
+Ilova ishga tushganda kerakli jadvallar avtomatik yaratiladi (`create_all`) va
+boshlang'ich ma'lumotlar (rollar, ruxsatlar, admin, to'lov turlari, birliklar)
+seed qilinadi. Ishlab chiqarish (production) uchun Alembic tavsiya etiladi:
 
 ```bash
-# Birinchi migratsiyani yaratish (modellardan avtomatik):
 alembic revision --autogenerate -m "initial schema"
-# Bazaga qo'llash:
 alembic upgrade head
 ```
 
@@ -88,23 +90,54 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Ilova: http://localhost:8000 · API hujjatlari: http://localhost:8000/docs
+- Ilova: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- Sog'lomlik: http://localhost:8000/health
+
+**Boshlang'ich admin** (`.env` dan sozlanadi): `admin` / `Admin12345!`
+Kirgach parolni albatta o'zgartiring.
+
+### 6. Testlar
+
+```bash
+pytest
+```
+
+Testlar xotiradagi SQLite'da ishlaydi — tashqi baza talab qilmaydi.
 
 ## Ishlab chiqish bosqichlari
 
 - [x] 1-bosqich — Database (modellar, ER diagram, migratsiya sozlamasi)
-- [ ] 2-bosqich — Authentication (JWT, bcrypt)
-- [ ] 3-bosqich — RBAC / Permissions
-- [ ] 4-bosqich — Admin panel
-- [ ] 5-bosqich — Mahsulotlar
-- [ ] 6-bosqich — Yetkazib beruvchilar
-- [ ] 7-bosqich — Fermerlar / mijozlar
-- [ ] 8-bosqich — Kirim
-- [ ] 9-bosqich — Chiqim
-- [ ] 10-bosqich — Qarzdorlar
-- [ ] 11-bosqich — Hisobotlar
-- [ ] 12-bosqich — Dashboard
-- [ ] 13-bosqich — Responsive UI
-- [ ] 14-bosqich — Testlar
+- [x] 2-bosqich — Authentication (JWT, bcrypt, refresh, me)
+- [x] 3-bosqich — RBAC / Permissions (rollar, ruxsatlar, dependency)
+- [x] 4-bosqich — Admin panel (users, roles, settings, payment methods)
+- [x] 5-bosqich — Mahsulotlar (CRUD, barcode, rasm, filtr)
+- [x] 6-bosqich — Yetkazib beruvchilar
+- [x] 7-bosqich — Fermerlar / mijozlar (qarz xulosasi, tarix)
+- [x] 8-bosqich — Kirim (ombor avtomatik oshadi)
+- [x] 9-bosqich — Chiqim (ombor kamayadi, aralash to'lov, qarz)
+- [x] 10-bosqich — Qarzdorlar (qisman to'lov, tarix)
+- [x] 11-bosqich — Hisobotlar (Excel/PDF eksport)
+- [x] 12-bosqich — Dashboard (statistika, grafiklar) + Eslatmalar
+- [ ] 13-bosqich — Responsive UI (Jinja2/Bootstrap — keyingi bosqich)
+- [x] 14-bosqich — Testlar (pytest, SQLite)
+
+## REST API (asosiy endpointlar)
+
+Barcha endpointlar `/api/v1` prefiksi ostida. Autentifikatsiya: `Authorization: Bearer <token>`.
+
+| Guruh | Endpoint |
+|-------|----------|
+| Auth | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
+| Users | `GET/POST /users`, `PUT/DELETE /users/{id}`, `POST /users/{id}/reset-password`, `/activate`, `/deactivate` |
+| Profile | `PUT /profile`, `POST /profile/change-password` |
+| Roles | `GET/POST /roles`, `PUT/DELETE /roles/{id}`, `GET /permissions` |
+| Katalog | `/categories`, `/units`, `/products` (CRUD, `/products/barcode/{code}`, `/products/{id}/image`) |
+| Kontragent | `/suppliers`, `/customers` (`GET /customers/{id}` — qarz + tarix) |
+| Operatsiya | `POST/GET /stock-in`, `POST/GET /stock-out` |
+| To'lov/Qarz | `/payment-methods`, `/debts`, `POST /debts/{id}/payments` |
+| Eslatma | `GET /reminders`, `GET /reminders/call-list` |
+| Insight | `GET /dashboard`, `/reports/*` (`?format=excel|pdf`), `GET /audit-logs` |
 
 Batafsil ma'lumotlar bazasi sxemasi: [`docs/ER_DIAGRAM.md`](docs/ER_DIAGRAM.md).
