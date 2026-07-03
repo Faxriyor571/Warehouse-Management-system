@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
 from app.models.debt import Debt
-from app.models.enums import DebtStatus
 from app.models.product import Product
 from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut, StockOutItem
