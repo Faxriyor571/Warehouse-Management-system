@@ -1,7 +1,12 @@
 """Stock-out (Chiqim / Sale) schemas."""
 from __future__ import annotations
 
-from datetime import date, datetime
+# NOTE: the ``date`` type is imported under an alias because this module has a
+# model field literally named ``date`` (StockOutCreate.date). Under
+# ``from __future__ import annotations`` Pydantic v2 resolves annotations using
+# the class namespace as locals, so a field named ``date`` would shadow the
+# ``date`` type and break ``due_date: date | None`` with a TypeError.
+from datetime import date as date_type, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,7 +38,7 @@ class StockOutCreate(BaseModel):
     # Payments made at sale time (optional). Any unpaid remainder becomes a debt.
     payments: list[PaymentCreate] = Field(default_factory=list)
     # If a debt is created, this optional due date is applied.
-    due_date: date | None = None
+    due_date: date_type | None = None
 
 
 class StockOutItemOut(BaseModel):
