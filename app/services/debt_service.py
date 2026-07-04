@@ -1,7 +1,7 @@
 """Debt (Qarz) business logic: creation, repayments and status upkeep."""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date as date_type, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -138,7 +138,7 @@ def refresh_overdue(db: Session) -> int:
     return updated
 
 
-def _status_for_due(due: date | None, *, remaining: Decimal) -> DebtStatus:
+def _status_for_due(due: date_type | None, *, remaining: Decimal) -> DebtStatus:
     if remaining <= 0:
         return DebtStatus.PAID
     if due is not None and due < datetime.now(timezone.utc).date():

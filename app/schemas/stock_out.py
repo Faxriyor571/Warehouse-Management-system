@@ -1,11 +1,11 @@
 """Stock-out (Chiqim / Sale) schemas."""
 from __future__ import annotations
 
-# NOTE: the ``date`` type is imported under an alias because this module has a
-# model field literally named ``date`` (StockOutCreate.date). Under
-# ``from __future__ import annotations`` Pydantic v2 resolves annotations using
-# the class namespace as locals, so a field named ``date`` would shadow the
-# ``date`` type and break ``due_date: date | None`` with a TypeError.
+# NOTE: the date type is imported under an alias (date_type) because this
+# module has a model field literally named "date" (StockOutCreate.date). Under
+# "from __future__ import annotations" Pydantic v2 resolves annotations using
+# the class namespace as locals, so a field named "date" would shadow the date
+# type and break the optional-due-date annotation with a TypeError.
 from datetime import date as date_type, datetime
 from decimal import Decimal
 

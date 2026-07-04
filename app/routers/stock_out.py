@@ -1,7 +1,7 @@
 """Stock-out (Chiqim / Sale) endpoints."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import func
@@ -45,8 +45,8 @@ def list_stock_out(
     search: str | None = Query(default=None, description="Hujjat raqami"),
     customer_id: int | None = Query(default=None),
     payment_status: PaymentStatus | None = Query(default=None),
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: date_type | None = Query(default=None),
+    date_to: date_type | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
 ) -> PaginatedResponse[StockOutOut]:

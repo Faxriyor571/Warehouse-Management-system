@@ -1,7 +1,7 @@
 """Debt reminder schemas."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as date_type
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -15,7 +15,7 @@ class DebtReminder(BaseModel):
     customer_name: str
     phone: str | None = None
     remaining_amount: Decimal
-    due_date: date | None = None
+    due_date: date_type | None = None
     days_left: int | None = None  # negative => overdue
     status: str  # "due_today" | "due_tomorrow" | "overdue" | "upcoming"
 
@@ -37,5 +37,5 @@ class CallListEntry(BaseModel):
     customer_name: str
     phone: str | None = None
     remaining_amount: Decimal
-    due_date: date | None = None
+    due_date: date_type | None = None
     reason: str

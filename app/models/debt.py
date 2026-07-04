@@ -6,7 +6,10 @@ due date and status.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+# The date type is aliased so it can never be shadowed by a field/attribute
+# named ``date`` when SQLAlchemy / Pydantic evaluate string annotations under
+# ``from __future__ import annotations``.
+from datetime import date as date_type, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -48,8 +51,8 @@ class Debt(Base, TimestampMixin):
     # Stored, denormalised remaining amount kept in sync on each payment.
     remaining_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
 
-    start_date: Mapped[date] = mapped_column(Date, server_default=func.current_date(), nullable=False)
-    due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    start_date: Mapped[date_type] = mapped_column(Date, server_default=func.current_date(), nullable=False)
+    due_date: Mapped[date_type | None] = mapped_column(Date, nullable=True, index=True)
 
     status: Mapped[DebtStatus] = mapped_column(
         SAEnum(DebtStatus, name="debt_status"),

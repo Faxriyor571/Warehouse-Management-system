@@ -1,7 +1,7 @@
 """Reporting logic: sales, purchases, debts, inventory and profit."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as date_type
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -28,7 +28,7 @@ from app.schemas.report import (
 _ZERO = Decimal("0")
 
 
-def _apply_date_range(stmt, column, date_from: date | None, date_to: date | None):
+def _apply_date_range(stmt, column, date_from: date_type | None, date_to: date_type | None):
     if date_from is not None:
         stmt = stmt.where(func.date(column) >= date_from)
     if date_to is not None:
@@ -36,7 +36,7 @@ def _apply_date_range(stmt, column, date_from: date | None, date_to: date | None
     return stmt
 
 
-def sales_report(db: Session, date_from: date | None, date_to: date | None) -> SalesReport:
+def sales_report(db: Session, date_from: date_type | None, date_to: date_type | None) -> SalesReport:
     stmt = (
         select(StockOut, Customer.full_name)
         .join(Customer, StockOut.customer_id == Customer.id, isouter=True)
@@ -66,7 +66,7 @@ def sales_report(db: Session, date_from: date | None, date_to: date | None) -> S
     )
 
 
-def purchase_report(db: Session, date_from: date | None, date_to: date | None) -> PurchaseReport:
+def purchase_report(db: Session, date_from: date_type | None, date_to: date_type | None) -> PurchaseReport:
     stmt = (
         select(StockIn, Supplier.name)
         .join(Supplier, StockIn.supplier_id == Supplier.id, isouter=True)
@@ -143,7 +143,7 @@ def inventory_report(db: Session) -> InventoryReport:
     return InventoryReport(rows=rows, total_stock_value=total_value, count=len(rows))
 
 
-def profit_report(db: Session, date_from: date | None, date_to: date | None) -> ProfitReport:
+def profit_report(db: Session, date_from: date_type | None, date_to: date_type | None) -> ProfitReport:
     stmt = (
         select(
             func.coalesce(func.sum(StockOutItem.subtotal), 0),

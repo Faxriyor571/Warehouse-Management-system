@@ -1,7 +1,7 @@
 """Debt (Qarz) schemas."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,8 +16,8 @@ class DebtCreate(BaseModel):
 
     customer_id: int
     amount: Decimal = Field(gt=0)
-    due_date: date | None = None
-    start_date: date | None = None
+    due_date: date_type | None = None
+    start_date: date_type | None = None
     note: str | None = None
 
 
@@ -50,8 +50,8 @@ class DebtOut(BaseModel):
     amount: Decimal
     paid_amount: Decimal
     remaining_amount: Decimal
-    start_date: date
-    due_date: date | None = None
+    start_date: date_type
+    due_date: date_type | None = None
     status: DebtStatus
     note: str | None = None
     created_at: datetime

@@ -10,7 +10,7 @@ Creating a sale atomically:
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as date_type
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -186,7 +186,7 @@ def _status_for(paid: Decimal, total: Decimal) -> PaymentStatus:
     return PaymentStatus.PARTIAL
 
 
-def _debt_status(due: date | None) -> DebtStatus:
+def _debt_status(due: date_type | None) -> DebtStatus:
     from datetime import datetime, timezone
 
     if due is not None and due < datetime.now(timezone.utc).date():

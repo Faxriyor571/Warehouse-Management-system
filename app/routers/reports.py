@@ -1,7 +1,7 @@
 """Report endpoints with JSON output and Excel/PDF export."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as date_type
 from enum import Enum
 from typing import Any, Sequence
 
@@ -60,8 +60,8 @@ def _export(
 )
 def sales_report(
     db: DbSession,
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: date_type | None = Query(default=None),
+    date_to: date_type | None = Query(default=None),
     fmt: ReportFormat = Query(default=ReportFormat.JSON, alias="format"),
 ) -> SalesReport | Response:
     report = report_service.sales_report(db, date_from, date_to)
@@ -83,8 +83,8 @@ def sales_report(
 )
 def purchase_report(
     db: DbSession,
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: date_type | None = Query(default=None),
+    date_to: date_type | None = Query(default=None),
     fmt: ReportFormat = Query(default=ReportFormat.JSON, alias="format"),
 ) -> PurchaseReport | Response:
     report = report_service.purchase_report(db, date_from, date_to)
@@ -146,7 +146,7 @@ def inventory_report(
 )
 def profit_report(
     db: DbSession,
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: date_type | None = Query(default=None),
+    date_to: date_type | None = Query(default=None),
 ) -> ProfitReport:
     return report_service.profit_report(db, date_from, date_to)
