@@ -6,7 +6,8 @@ from __future__ import annotations
 # "from __future__ import annotations" Pydantic v2 resolves annotations using
 # the class namespace as locals, so a field named "date" would shadow the date
 # type and break the optional-due-date annotation with a TypeError.
-from datetime import date as date_type, datetime
+from datetime import date as date_type
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -1,5 +1,6 @@
-# Local development database.
-# Ishga tushirish:  docker compose up -d
+# Full local stack: FastAPI app + PostgreSQL.
+# Ishga tushirish:  docker compose up --build
+# Faqat baza:       docker compose up -d db
 # To'xtatish:       docker compose down
 # Ma'lumotlar `pgdata` volume da saqlanadi.
 
@@ -21,6 +22,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wms_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Point the app at the "db" service on the compose network.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-wms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wms_password}
+      POSTGRES_DB: ${POSTGRES_DB:-wms_db}
+      SECRET_KEY: ${SECRET_KEY:-change_me_in_production}
+      APP_ENV: ${APP_ENV:-development}
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
 
 volumes:
   pgdata:

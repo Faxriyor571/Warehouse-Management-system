@@ -1,7 +1,8 @@
 """Debt (Qarz) business logic: creation, repayments and status upkeep."""
 from __future__ import annotations
 
-from datetime import date as date_type, datetime, timezone
+from datetime import date as date_type
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session

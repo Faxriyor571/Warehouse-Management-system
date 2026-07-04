@@ -52,8 +52,8 @@ def to_pdf(title: str, headers: Sequence[str], rows: Sequence[Sequence[Any]]) ->
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import (
-        SimpleDocTemplate,
         Paragraph,
+        SimpleDocTemplate,
         Spacer,
         Table,
         TableStyle,

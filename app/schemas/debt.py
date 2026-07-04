@@ -1,7 +1,8 @@
 """Debt (Qarz) schemas."""
 from __future__ import annotations
 
-from datetime import date as date_type, datetime
+from datetime import date as date_type
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
