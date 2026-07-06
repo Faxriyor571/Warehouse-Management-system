@@ -22,11 +22,41 @@ def authenticate(
     username: str,
     password: str,
     *,
+    company_slug: str | None = None,
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> User:
-    """Verify credentials and return the user, or raise ``AuthenticationError``."""
-    user = user_crud.get_by_username(db, username)
+    """Verify credentials and return the user, or raise ``AuthenticationError``.
+
+    Resolution order (API_SPECIFICATION.md §1, DATABASE_DESIGN.md §6):
+
+        company_slug -> Company (must be active)
+                     -> username within that company
+                     -> User -> password
+
+    When ``company_slug`` is omitted the username is resolved within the
+    Super Admin / legacy scope (``company_id IS NULL``), so platform Super
+    Admins and existing single-tenant users continue to log in as before.
+    A CEO/Seller must supply their ``company_slug`` — omitting it simply
+    fails to resolve their tenant-scoped account. No global username lookup
+    is performed for tenant users.
+    """
+    if company_slug is not None:
+        company = company_crud.get_by_slug(db, company_slug)
+        if company is None or company.status != CompanyStatus.ACTIVE:
+            audit_service.log_action(
+                db,
+                action=AuditAction.LOGIN_FAILED,
+                user_id=None,
+                description=f"Muvaffaqiyatsiz kirish urinishi (kompaniya): {company_slug}/{username}",
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            raise AuthenticationError("Kompaniya topilmadi yoki faol emas")
+        user = user_crud.get_by_username(db, username, company_id=company.id)
+    else:
+        user = user_crud.get_by_username(db, username)
+
     if user is None or not security.verify_password(password, user.hashed_password):
         audit_service.log_action(
             db,
@@ -42,31 +72,6 @@ def authenticate(
         raise AuthenticationError("Foydalanuvchi faol emas")
 
     return user
-
-
-def _resolve_company(db: Session, company_slug: str | None, user: User) -> None:
-    """Enforce company status/membership for a user belonging to a company.
-
-    Legacy users (``user.company_id is None``) are never subject to this —
-    this is purely additive for the new multi-tenant identity and never
-    affects the existing single-tenant login path.
-
-    The company's active status is enforced for every tenant user
-    unconditionally, regardless of whether ``company_slug`` was supplied, so
-    a suspended company blocks login for all of its users immediately
-    (API_SPECIFICATION.md §2). ``company_slug``, when supplied, is an
-    additional check that the caller is logging into the company they
-    actually belong to.
-    """
-    if user.company_id is None:
-        return
-
-    company = company_crud.get(db, user.company_id)
-    if company is None or company.status != CompanyStatus.ACTIVE:
-        raise AuthenticationError("Kompaniya topilmadi yoki faol emas")
-
-    if company_slug is not None and company.slug != company_slug:
-        raise AuthenticationError("Foydalanuvchi ushbu kompaniyaga tegishli emas")
 
 
 def issue_tokens(db: Session, user: User) -> Token:
@@ -110,9 +115,13 @@ def login(
 ) -> tuple[User, Token]:
     """Authenticate, update last-login, record audit and return tokens."""
     user = authenticate(
-        db, username, password, ip_address=ip_address, user_agent=user_agent
+        db,
+        username,
+        password,
+        company_slug=company_slug,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
-    _resolve_company(db, company_slug, user)
 
     user.last_login_at = datetime.now(timezone.utc)
     db.add(user)

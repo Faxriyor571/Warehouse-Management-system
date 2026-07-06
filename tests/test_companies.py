@@ -89,16 +89,22 @@ def test_create_company_duplicate_slug_rejected(client: TestClient, db_session: 
     assert resp.status_code == 409
 
 
-def test_create_company_duplicate_ceo_username_rejected(
+def test_create_company_reuses_ceo_username_across_companies(
     client: TestClient, db_session: Session
 ) -> None:
+    """CEO usernames are unique per company, not globally (DATABASE_DESIGN.md §6).
+
+    Two different companies may each onboard a CEO with the same username;
+    company creation must succeed for both. (This previously asserted a
+    global-uniqueness 409, which was the identity-scoping bug fixed here.)
+    """
     headers = _super_admin_headers(client, db_session, username="root-c")
     client.post("/api/v1/companies", headers=headers, json=_company_payload("comp-c1"))
 
     dup = _company_payload("comp-c2")
-    dup["ceo"]["username"] = "ceo-comp-c1"  # already used by comp-c1's CEO
+    dup["ceo"]["username"] = "ceo-comp-c1"  # same username, different company
     resp = client.post("/api/v1/companies", headers=headers, json=dup)
-    assert resp.status_code == 409
+    assert resp.status_code == 201
 
 
 def test_list_and_get_company(client: TestClient, db_session: Session) -> None:

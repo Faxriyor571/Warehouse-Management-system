@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,9 +35,35 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
 
     __tablename__ = "users"
 
+    # Identity uniqueness is tenant-aware (DATABASE_DESIGN.md §6):
+    #   - Company users are unique within their company: UNIQUE(company_id, username)
+    #     and UNIQUE(company_id, email). Two different companies may each have a
+    #     user named "admin" (NULL company_ids are distinct in these constraints,
+    #     which also keeps them nullable-safe for email).
+    #   - Super Admin / legacy users have company_id IS NULL and must remain
+    #     globally unique among themselves, enforced by the partial indexes below.
+    __table_args__ = (
+        UniqueConstraint("company_id", "username", name="uq_users_company_username"),
+        UniqueConstraint("company_id", "email", name="uq_users_company_email"),
+        Index(
+            "uq_users_null_company_username",
+            "username",
+            unique=True,
+            sqlite_where=text("company_id IS NULL"),
+            postgresql_where=text("company_id IS NULL"),
+        ),
+        Index(
+            "uq_users_null_company_email",
+            "email",
+            unique=True,
+            sqlite_where=text("company_id IS NULL AND email IS NOT NULL"),
+            postgresql_where=text("company_id IS NULL AND email IS NOT NULL"),
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
-    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    username: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), index=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
 

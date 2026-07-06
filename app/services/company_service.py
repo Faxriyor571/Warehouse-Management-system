@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.auth import security
 from app.crud.company import company as company_crud
-from app.crud.user import user as user_crud
 from app.models.company import Company
 from app.models.enums import CompanyStatus, UserRole
 from app.models.refresh_token import RefreshToken
@@ -18,11 +17,15 @@ from app.utils.exceptions import ConflictError
 
 
 def create_company(db: Session, data: CompanyCreate) -> tuple[Company, User]:
-    """Onboard a new company and create its one CEO account, atomically."""
+    """Onboard a new company and create its one CEO account, atomically.
+
+    The CEO is the first user of a brand-new company, so its username/email
+    are trivially unique within that company (uniqueness is company-scoped —
+    DATABASE_DESIGN.md §6); no cross-company username check is performed, so
+    two different companies may each have, e.g., a CEO named "admin".
+    """
     if company_crud.get_by_slug(db, data.slug) is not None:
         raise ConflictError(f"'{data.slug}' slug allaqachon band")
-    if user_crud.get_by_username(db, data.ceo.username) is not None:
-        raise ConflictError(f"'{data.ceo.username}' username allaqachon band")
 
     company = Company(
         name=data.name,
