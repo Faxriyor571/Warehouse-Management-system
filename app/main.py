@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -85,10 +86,18 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-    """Return a 422 with a compact list of validation errors."""
+    """Return a 422 with a compact list of validation errors.
+
+    ``exc.errors()`` may contain non-JSON-serializable values in ``ctx`` — e.g.
+    the raw exception object when a schema validator raises ``ValueError`` — so
+    it is passed through ``jsonable_encoder`` (the same approach FastAPI's own
+    default handler uses) before serialization. Without this, such a validation
+    error would crash this handler and surface as a 500 instead of a 422. The
+    response shape is unchanged.
+    """
     return JSONResponse(
         status_code=422,
-        content={"detail": "Ma'lumotlar noto'g'ri", "errors": exc.errors()},
+        content={"detail": "Ma'lumotlar noto'g'ri", "errors": jsonable_encoder(exc.errors())},
     )
 
 
