@@ -9,6 +9,7 @@ from app.routers import (
     categories,
     companies,
     customers,
+    employees,
     dashboard,
     debts,
     payment_methods,
@@ -37,6 +38,7 @@ api_router.include_router(companies.router)
 
 # Company operations (multi-tenant, CEO / Seller)
 api_router.include_router(stores.router)
+api_router.include_router(employees.router)
 
 # Catalogue
 api_router.include_router(categories.router)
