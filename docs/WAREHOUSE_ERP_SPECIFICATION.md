@@ -235,9 +235,13 @@ current committed scope.
   - Customers belong to the company (tenant isolation).
   - A customer's outstanding **debt is calculated automatically** from sales and
     payments.
+  - Every customer has a **customer type**: **Individual** or **Legal Entity**.
+    The customer type determines the pricing rule applied at sale time (see
+    §4.6 Sales).
 - **Main UI:** Customer cards/list with quick access to balance and history;
   customer detail with purchase and debt history.
-- **Future extensions:** Customer contact actions (call/SMS/messaging).
+- **Future extensions:** Customer contact actions (call, general messaging)
+  beyond the confirmed SMS debt-reminder notifications (see §4.8 Debts).
 
 ### 4.5 Stock In
 
@@ -262,6 +266,15 @@ current committed scope.
   - Debt arising from credit sales is **calculated automatically**.
   - Quantities follow the 1 bag = 50 kg convention.
   - Sales are scoped to the seller's assigned store.
+  - **Sale cancellation:** a sale **may be cancelled only before it has been
+    finalized**. A sale that has already been completed **cannot** be
+    cancelled — reversing it must be done through a **Sale Return** instead
+    (see Returns, above). Inventory and financial records must remain fully
+    consistent under either path.
+  - **Legal entity pricing:** **Individual** customers are always sold at the
+    product's default selling price. Sellers **may override the selling price
+    only when the customer's type is Legal Entity** (see §4.4 Customers).
+    Sales to Individual customers never accept a price override.
 - **Main UI:** A fast sales workflow optimized for the fewest possible clicks;
   card-based product selection; mobile-first.
 - **Future extensions:** Printable/shareable receipts, discounts and promotions.
@@ -287,9 +300,15 @@ current committed scope.
   - Returns affect balances consistently with the original sale price.
   - Debt information is part of store financials and follows the
     financial-visibility rules.
+  - Every debt record includes an **expected payment date (due date)**.
+  - The system **generates a reminder notification when a debt's due date
+    arrives**, for any debt not yet fully paid.
+  - **SMS notification support is a core requirement**: debt due-date
+    reminders are delivered to the customer via SMS.
 - **Main UI:** Debt list/cards with outstanding balances; per-customer debt and
   payment history.
-- **Future extensions:** Repayment reminders and customer notifications.
+- **Future extensions:** Additional reminder channels beyond SMS (e.g. call,
+  in-app push notifications).
 
 ### 4.9 Employees
 
@@ -352,6 +371,19 @@ must be added to this document before it is implemented.
 14. **Mobile-first design:** The application is designed mobile-first.
 15. **PWA support:** The application supports Progressive Web App capabilities.
 16. **Simple UI:** The UI is simple, with minimal manual input.
+17. **Customer type:** Every customer is classified as either **Individual** or
+    **Legal Entity**.
+18. **Legal entity pricing override:** Sellers may override a product's selling
+    price **only** when selling to a Legal Entity customer; Individual-customer
+    sales always use the default selling price.
+19. **Sale cancellation:** A sale may be cancelled only before it is finalized.
+    A completed sale can only be reversed via a Sale Return, never cancelled.
+20. **Debt due date:** Every debt record includes an expected payment (due)
+    date.
+21. **Debt reminders:** The system generates a reminder notification when a
+    debt's due date arrives.
+22. **SMS notifications:** SMS delivery of debt due-date reminders is a core
+    platform requirement.
 
 ---
 
@@ -392,6 +424,8 @@ The technologies below are the recommended stack for the platform.
 - **SQLAlchemy** — ORM for data access.
 - **PostgreSQL** — relational database.
 - **Alembic** — database schema migrations.
+- **SMS Gateway integration** — required for delivering debt due-date reminder
+  notifications (core requirement, §4.8 Debts).
 
 ### 7.3 Deployment
 
@@ -422,7 +456,8 @@ current confirmed scope. They are recorded here so that the current design can
 accommodate them, but they must not be implemented until promoted into the
 confirmed requirements.
 
-- Customer contact actions (call / SMS / messaging) and debt reminders.
+- Customer contact actions (call, general messaging) beyond the confirmed SMS
+  debt-reminder notifications.
 - Barcode-based product lookup and product images.
 - Printable/shareable sales receipts.
 - Inter-store inventory transfers.
