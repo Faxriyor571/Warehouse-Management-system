@@ -44,9 +44,11 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # --- Legacy RBAC (being phased out incrementally, module by module) ---
-    role_id: Mapped[int] = mapped_column(
+    # Nullable: users created through the new Companies/Employees flows (see
+    # ``role`` below) have no legacy role assignment at all.
+    role_id: Mapped[int | None] = mapped_column(
         ForeignKey("roles.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     # Marks the built-in super administrator (protected account).

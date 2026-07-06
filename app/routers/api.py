@@ -7,6 +7,7 @@ from app.routers import (
     audit,
     auth,
     categories,
+    companies,
     customers,
     dashboard,
     debts,
@@ -29,6 +30,9 @@ api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(roles.router)
+
+# Platform administration (multi-tenant, Super Admin only)
+api_router.include_router(companies.router)
 
 # Catalogue
 api_router.include_router(categories.router)

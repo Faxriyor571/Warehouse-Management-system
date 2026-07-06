@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 from app.auth import security
 from app.crud.user import user as user_crud
 from app.database import get_db
+from app.models.enums import UserRole
 from app.models.user import User
-from app.utils.exceptions import AuthenticationError
+from app.utils.exceptions import AuthenticationError, PermissionDeniedError
 
 # tokenUrl is used by the OpenAPI docs "Authorize" button.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -52,6 +53,21 @@ def get_current_active_user(
 
 CurrentUser = Annotated[User, Depends(get_current_active_user)]
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def require_super_admin(current_user: CurrentUser) -> User:
+    """Restrict a route to the new multi-tenant Super Admin role only.
+
+    This checks the new ``role`` field exclusively — it does not consult the
+    legacy ``is_superuser``/RBAC system, which remains a separate
+    authorization path during the incremental migration.
+    """
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise PermissionDeniedError("Faqat platforma administratori uchun")
+    return current_user
+
+
+RequireSuperAdmin = Annotated[User, Depends(require_super_admin)]
 
 
 class RequestContext:

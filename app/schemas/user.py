@@ -65,7 +65,9 @@ class UserOut(UserBase):
     id: int
     is_active: bool
     is_superuser: bool
-    role_id: int
+    # Nullable: users created through the new Companies/Employees flows have
+    # no legacy role assignment at all.
+    role_id: int | None
     # Legacy RBAC role assignment (being phased out incrementally).
     legacy_role: RoleSummary | None = None
     # Multi-tenant identity (DATABASE_DESIGN.md §3.3). Null until the user
