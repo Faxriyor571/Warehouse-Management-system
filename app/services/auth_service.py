@@ -45,18 +45,27 @@ def authenticate(
 
 
 def _resolve_company(db: Session, company_slug: str | None, user: User) -> None:
-    """Validate an optional ``company_slug`` against the authenticated user.
+    """Enforce company status/membership for a user belonging to a company.
 
-    Legacy users (``user.role is None``) never supply/require a
-    ``company_slug`` — this is purely additive for the new multi-tenant
-    identity and never affects the existing single-tenant login path.
+    Legacy users (``user.company_id is None``) are never subject to this —
+    this is purely additive for the new multi-tenant identity and never
+    affects the existing single-tenant login path.
+
+    The company's active status is enforced for every tenant user
+    unconditionally, regardless of whether ``company_slug`` was supplied, so
+    a suspended company blocks login for all of its users immediately
+    (API_SPECIFICATION.md §2). ``company_slug``, when supplied, is an
+    additional check that the caller is logging into the company they
+    actually belong to.
     """
-    if company_slug is None:
+    if user.company_id is None:
         return
-    company = company_crud.get_by_slug(db, company_slug)
+
+    company = company_crud.get(db, user.company_id)
     if company is None or company.status != CompanyStatus.ACTIVE:
         raise AuthenticationError("Kompaniya topilmadi yoki faol emas")
-    if user.company_id != company.id:
+
+    if company_slug is not None and company.slug != company_slug:
         raise AuthenticationError("Foydalanuvchi ushbu kompaniyaga tegishli emas")
 
 

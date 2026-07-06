@@ -153,6 +153,15 @@ def test_suspend_blocks_login_and_activate_restores(
     )
     assert blocked_login.status_code == 401
 
+    # Suspension must block login unconditionally — including when the
+    # caller omits company_slug (a suspended company's CEO/Seller must not
+    # be able to bypass the block simply by not naming their company).
+    blocked_login_no_slug = client.post(
+        "/api/v1/auth/login",
+        data={"username": "ceo-comp-f", "password": "Ceo12345!"},
+    )
+    assert blocked_login_no_slug.status_code == 401
+
     activate_resp = client.post(f"/api/v1/companies/{company_id}/activate", headers=headers)
     assert activate_resp.status_code == 200
     assert activate_resp.json()["status"] == "active"
