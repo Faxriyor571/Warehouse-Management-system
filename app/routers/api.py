@@ -19,6 +19,7 @@ from app.routers import (
     settings,
     stock_in,
     stock_out,
+    stores,
     suppliers,
     units,
     users,
@@ -33,6 +34,9 @@ api_router.include_router(roles.router)
 
 # Platform administration (multi-tenant, Super Admin only)
 api_router.include_router(companies.router)
+
+# Company operations (multi-tenant, CEO / Seller)
+api_router.include_router(stores.router)
 
 # Catalogue
 api_router.include_router(categories.router)

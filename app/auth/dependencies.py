@@ -67,7 +67,23 @@ def require_super_admin(current_user: CurrentUser) -> User:
     return current_user
 
 
+def require_ceo(current_user: CurrentUser) -> User:
+    """Restrict a route to a company CEO (new multi-tenant role)."""
+    if current_user.role != UserRole.CEO:
+        raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
+    return current_user
+
+
+def require_ceo_or_seller(current_user: CurrentUser) -> User:
+    """Allow either a CEO or a Seller (new multi-tenant roles)."""
+    if current_user.role not in (UserRole.CEO, UserRole.SELLER):
+        raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+    return current_user
+
+
 RequireSuperAdmin = Annotated[User, Depends(require_super_admin)]
+RequireCEO = Annotated[User, Depends(require_ceo)]
+RequireCEOOrSeller = Annotated[User, Depends(require_ceo_or_seller)]
 
 
 class RequestContext:
