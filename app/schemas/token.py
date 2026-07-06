@@ -25,6 +25,17 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    """Optional body for the logout endpoint.
+
+    Supplying ``refresh_token`` revokes that specific session; omitting the
+    body entirely (as existing clients do) keeps working unchanged — it
+    just records the logout audit event without revoking a session.
+    """
+
+    refresh_token: str | None = None
+
+
 class LoginRequest(BaseModel):
     """JSON login body (alternative to OAuth2 form)."""
 

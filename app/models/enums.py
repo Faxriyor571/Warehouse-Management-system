@@ -57,3 +57,24 @@ class AuditAction(str, enum.Enum):
     PAYMENT = "payment"
     PRICE_CHANGE = "price_change"
     LOGIN_FAILED = "login_failed"
+
+
+class UserRole(str, enum.Enum):
+    """Fixed multi-tenant role hierarchy (DATABASE_DESIGN.md §12).
+
+    This is the permanent, final name/shape for the role concept going
+    forward. It coexists with the legacy ``RoleName``/``Role`` RBAC system
+    during the incremental migration; ``RoleName`` is removed once every
+    module has moved over.
+    """
+
+    SUPER_ADMIN = "super_admin"
+    CEO = "ceo"
+    SELLER = "seller"
+
+
+class CompanyStatus(str, enum.Enum):
+    """Lifecycle status of a company (tenant)."""
+
+    ACTIVE = "active"
+    SUSPENDED = "suspended"

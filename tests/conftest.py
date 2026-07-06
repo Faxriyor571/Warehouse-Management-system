@@ -74,3 +74,18 @@ def admin_token(client: TestClient) -> str:
 @pytest.fixture()
 def auth_headers(admin_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest.fixture()
+def db_session() -> Generator[Session, None, None]:
+    """A raw DB session for tests that need to set up rows directly.
+
+    Used by multi-tenant tests to create Company/Store/User rows for
+    modules (Companies, Stores, Employees) that don't have their own
+    creation endpoints yet in this phase.
+    """
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

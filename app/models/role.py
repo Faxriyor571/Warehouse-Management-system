@@ -74,7 +74,7 @@ class Role(Base, TimestampMixin):
         back_populates="roles",
         lazy="selectin",
     )
-    users: Mapped[list["User"]] = relationship(back_populates="role")
+    users: Mapped[list["User"]] = relationship(back_populates="legacy_role")
 
     def has_permission(self, code: str) -> bool:
         return any(p.code == code for p in self.permissions)

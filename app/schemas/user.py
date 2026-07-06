@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.models.enums import UserRole
 from app.schemas.role import RoleSummary
 
 
@@ -65,6 +66,12 @@ class UserOut(UserBase):
     is_active: bool
     is_superuser: bool
     role_id: int
-    role: RoleSummary | None = None
+    # Legacy RBAC role assignment (being phased out incrementally).
+    legacy_role: RoleSummary | None = None
+    # Multi-tenant identity (DATABASE_DESIGN.md §3.3). Null until the user
+    # has been migrated to / created under the new Companies/Employees flow.
+    role: UserRole | None = None
+    company_id: int | None = None
+    store_id: int | None = None
     last_login_at: datetime | None = None
     created_at: datetime
