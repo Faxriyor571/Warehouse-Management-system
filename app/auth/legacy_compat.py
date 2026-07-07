@@ -172,3 +172,18 @@ RequirePaymentMethodRead = Annotated[User, Depends(require_payment_method_read)]
 RequirePaymentMethodManage = Annotated[User, Depends(require_payment_method_manage)]
 RequireDebtActor = Annotated[User, Depends(require_debt_actor)]
 RequireLegacyDebtManage = Annotated[User, Depends(require_legacy_debt_manage)]
+
+
+def require_expense_actor(current_user: CurrentUser) -> User:
+    """Allow recording / reading Expenses: CEO or Seller (spec, §12) or the
+    legacy admin (transitional). Remove the ``is_superuser`` branch when the
+    legacy world retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+RequireExpenseActor = Annotated[User, Depends(require_expense_actor)]

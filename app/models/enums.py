@@ -56,6 +56,7 @@ class AuditAction(str, enum.Enum):
     STOCK_OUT = "stock_out"
     SALES_RETURN = "sales_return"
     PAYMENT = "payment"
+    EXPENSE = "expense"
     PRICE_CHANGE = "price_change"
     LOGIN_FAILED = "login_failed"
 
@@ -88,6 +89,15 @@ class CustomerType(str, enum.Enum):
 
     INDIVIDUAL = "individual"
     LEGAL_ENTITY = "legal_entity"
+
+
+class ExpenseType(str, enum.Enum):
+    """Fixed Version 1 expense classification (DATABASE_DESIGN.md §3.22)."""
+
+    FUEL = "fuel"
+    DRIVER = "driver"
+    LOADER = "loader"
+    OTHER = "other"
 
 
 class MovementType(str, enum.Enum):

@@ -16,12 +16,14 @@ from app.models.enums import (
     CompanyStatus,
     CustomerType,
     DebtStatus,
+    ExpenseType,
     MovementType,
     PaymentMethodType,
     PaymentStatus,
     RoleName,
     UserRole,
 )
+from app.models.expense import Expense
 from app.models.payment import Payment
 from app.models.payment_method import PaymentMethod
 from app.models.product import Product
@@ -46,6 +48,7 @@ __all__ = [
     "Customer",
     "Debt",
     "DebtPayment",
+    "Expense",
     "Payment",
     "PaymentMethod",
     "Product",
@@ -71,6 +74,7 @@ __all__ = [
     "CompanyStatus",
     "CustomerType",
     "DebtStatus",
+    "ExpenseType",
     "MovementType",
     "PaymentMethodType",
     "PaymentStatus",

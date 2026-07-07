@@ -12,6 +12,7 @@ from app.routers import (
     employees,
     dashboard,
     debts,
+    expenses,
     inventory,
     payment_methods,
     products,
@@ -62,6 +63,7 @@ api_router.include_router(stock_out.router, prefix="/sales")
 api_router.include_router(payment_methods.router)
 api_router.include_router(debts.router)
 api_router.include_router(reminders.router)
+api_router.include_router(expenses.router)
 
 # Insights
 api_router.include_router(dashboard.router)
