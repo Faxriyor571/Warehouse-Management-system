@@ -139,6 +139,29 @@ def require_payment_method_manage(current_user: CurrentUser) -> User:
     raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
 
 
+def require_debt_actor(current_user: CurrentUser) -> User:
+    """Allow reading Debts / recording repayments / editing due-date: CEO or
+    Seller (spec, §11) or the legacy admin (transitional). Remove the
+    ``is_superuser`` branch when the legacy world retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+def require_legacy_debt_manage(current_user: CurrentUser) -> User:
+    """Allow creating a standalone debt (not tied to a sale): legacy admin
+    only. Not a spec'd endpoint (API_SPECIFICATION.md §11 only creates debts
+    automatically via Sales) — kept working for the legacy flow, not
+    extended to CEO/Seller. Remove when the legacy world retires.
+    """
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat administrator uchun")
+
+
 RequireCatalogueRead = Annotated[User, Depends(require_catalogue_read)]
 RequireCatalogueManage = Annotated[User, Depends(require_catalogue_manage)]
 RequireStockInActor = Annotated[User, Depends(require_stock_in_actor)]
@@ -147,3 +170,5 @@ RequireCustomerActor = Annotated[User, Depends(require_customer_actor)]
 RequireCustomerManage = Annotated[User, Depends(require_customer_manage)]
 RequirePaymentMethodRead = Annotated[User, Depends(require_payment_method_read)]
 RequirePaymentMethodManage = Annotated[User, Depends(require_payment_method_manage)]
+RequireDebtActor = Annotated[User, Depends(require_debt_actor)]
+RequireLegacyDebtManage = Annotated[User, Depends(require_legacy_debt_manage)]

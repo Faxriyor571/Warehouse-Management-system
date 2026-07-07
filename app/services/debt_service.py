@@ -12,7 +12,7 @@ from app.crud.debt import debt as debt_crud
 from app.crud.payment_method import payment_method as pm_crud
 from app.models.debt import Debt, DebtPayment
 from app.models.enums import AuditAction, DebtStatus, PaymentStatus
-from app.schemas.debt import DebtCreate, DebtPaymentCreate
+from app.schemas.debt import DebtCreate, DebtDueDateUpdate, DebtPaymentCreate
 from app.services import audit_service
 from app.utils.exceptions import NotFoundError, ValidationError
 
@@ -118,6 +118,35 @@ def add_payment(
         user_agent=user_agent,
     )
     return payment
+
+
+def update_due_date(
+    db: Session,
+    debt: Debt,
+    data: DebtDueDateUpdate,
+    *,
+    user_id: int,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> Debt:
+    """Edit a debt's due date and recompute its status (API_SPECIFICATION.md §11)."""
+    debt.due_date = data.due_date
+    debt.status = _status_for_due(debt.due_date, remaining=debt.remaining_amount)
+    db.add(debt)
+    db.commit()
+    db.refresh(debt)
+
+    audit_service.log_action(
+        db,
+        action=AuditAction.UPDATE,
+        user_id=user_id,
+        entity_type="debt",
+        entity_id=debt.id,
+        description=f"Qarz muddati o'zgartirildi: {debt.due_date}",
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return debt
 
 
 def refresh_overdue(db: Session) -> int:
