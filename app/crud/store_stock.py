@@ -16,10 +16,20 @@ from app.utils.pagination import PageParams
 class CRUDStoreStock:
     """Data access for :class:`StoreStock` balances."""
 
-    def get(self, db: Session, store_id: int, product_id: int) -> StoreStock | None:
+    def get(
+        self, db: Session, store_id: int, product_id: int, *, for_update: bool = False
+    ) -> StoreStock | None:
+        """Fetch a ``(store, product)`` balance row.
+
+        ``for_update=True`` takes a row-level lock (``SELECT … FOR UPDATE``) so
+        concurrent writers on the same pair serialize instead of losing
+        updates. Dialect-safe: a no-op on SQLite, a real lock on PostgreSQL.
+        """
         stmt = select(StoreStock).where(
             StoreStock.store_id == store_id, StoreStock.product_id == product_id
         )
+        if for_update:
+            stmt = stmt.with_for_update()
         return db.execute(stmt).scalar_one_or_none()
 
     def list_for_store(

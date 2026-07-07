@@ -54,6 +54,7 @@ class AuditAction(str, enum.Enum):
     DELETE = "delete"
     STOCK_IN = "stock_in"
     STOCK_OUT = "stock_out"
+    SALES_RETURN = "sales_return"
     PAYMENT = "payment"
     PRICE_CHANGE = "price_change"
     LOGIN_FAILED = "login_failed"
@@ -78,6 +79,15 @@ class CompanyStatus(str, enum.Enum):
 
     ACTIVE = "active"
     SUSPENDED = "suspended"
+
+
+class CustomerType(str, enum.Enum):
+    """Individual vs. Legal Entity (SRS rule #17), used to gate rule #18
+    (legal-entity price override). Minimal addition for Sales — not a
+    Customers migration."""
+
+    INDIVIDUAL = "individual"
+    LEGAL_ENTITY = "legal_entity"
 
 
 class MovementType(str, enum.Enum):

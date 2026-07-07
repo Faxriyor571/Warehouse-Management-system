@@ -43,7 +43,10 @@ def apply_movement(
     the balance below zero is rejected with ``InsufficientStockError`` unless
     ``allow_negative`` is set (e.g. for a corrective adjustment).
     """
-    row = store_stock_crud.get(db, store_id, product_id)
+    # Lock the balance row so concurrent writers on the same (store, product)
+    # serialize instead of losing updates (see DATABASE_DESIGN.md §11 / the
+    # concurrency review). No-op on SQLite; real FOR UPDATE on PostgreSQL.
+    row = store_stock_crud.get(db, store_id, product_id, for_update=True)
     if row is None:
         row = StoreStock(store_id=store_id, product_id=product_id, quantity=Decimal("0"))
         db.add(row)

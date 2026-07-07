@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,12 +30,37 @@ QTY = Numeric(14, 3)
 
 
 class StockOut(Base, TimestampMixin):
-    """Header of an outbound sale document."""
+    """Header of an outbound sale document (the "Sales" module, API §9).
+
+    Company/store scoped (DATABASE_DESIGN.md §3.14/§6): ``reference`` is
+    unique **within its store** (not company — receipts are store-printed).
+    ``company_id``/``store_id`` are nullable during the migration — rows
+    created through the legacy single-tenant admin have them NULL and remain
+    unique among themselves via the partial index below.
+    """
 
     __tablename__ = "stock_outs"
 
+    __table_args__ = (
+        UniqueConstraint("store_id", "reference", name="uq_stock_outs_store_reference"),
+        Index(
+            "uq_stock_outs_null_store_reference",
+            "reference",
+            unique=True,
+            sqlite_where=text("store_id IS NULL"),
+            postgresql_where=text("store_id IS NULL"),
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
-    reference: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    reference: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    store_id: Mapped[int | None] = mapped_column(
+        ForeignKey("stores.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
 
     customer_id: Mapped[int | None] = mapped_column(
         ForeignKey("customers.id", ondelete="RESTRICT"), nullable=True, index=True

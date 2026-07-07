@@ -37,6 +37,15 @@ class Debt(Base, TimestampMixin):
     __tablename__ = "debts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Denormalized scope (DATABASE_DESIGN.md §3.20), set by Sales when the debt
+    # is created; nullable for the legacy single-tenant flow. Not otherwise
+    # used — the Debts module itself is not migrated in this phase.
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    store_id: Mapped[int | None] = mapped_column(
+        ForeignKey("stores.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     customer_id: Mapped[int] = mapped_column(
         ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )

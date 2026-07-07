@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,13 +26,37 @@ QTY = Numeric(14, 3)
 
 
 class StockIn(Base, TimestampMixin):
-    """Header of an inbound delivery document."""
+    """Header of an inbound delivery document.
+
+    Company/store scoped (DATABASE_DESIGN.md §3.12): ``reference`` is unique
+    within its company. ``company_id``/``store_id`` are nullable during the
+    migration — rows created through the legacy single-tenant admin have them
+    NULL and remain unique among themselves via the partial index below.
+    """
 
     __tablename__ = "stock_ins"
 
+    __table_args__ = (
+        UniqueConstraint("company_id", "reference", name="uq_stock_ins_company_reference"),
+        Index(
+            "uq_stock_ins_null_company_reference",
+            "reference",
+            unique=True,
+            sqlite_where=text("company_id IS NULL"),
+            postgresql_where=text("company_id IS NULL"),
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Human readable document number, e.g. "IN-2026-000123".
-    reference: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    # Human readable document number, e.g. "IN-000123" (per company).
+    reference: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    store_id: Mapped[int | None] = mapped_column(
+        ForeignKey("stores.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
 
     supplier_id: Mapped[int | None] = mapped_column(
         ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=True, index=True

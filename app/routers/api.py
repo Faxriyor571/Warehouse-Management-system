@@ -53,7 +53,10 @@ api_router.include_router(customers.router)
 
 # Operations
 api_router.include_router(stock_in.router)
-api_router.include_router(stock_out.router)
+# Sales: mounted at both /stock-out (legacy) and /sales (API_SPECIFICATION.md
+# §9) — same router, same implementation, no code duplication.
+api_router.include_router(stock_out.router, prefix="/stock-out")
+api_router.include_router(stock_out.router, prefix="/sales")
 
 # Payments & debts
 api_router.include_router(payment_methods.router)

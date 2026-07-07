@@ -54,5 +54,39 @@ def require_catalogue_manage(current_user: CurrentUser) -> User:
     raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
 
 
+def require_stock_in_actor(current_user: CurrentUser) -> User:
+    """Allow recording / reading Stock In: CEO or Seller (spec, §8) or the legacy
+    admin (transitional).
+
+    Same role set as ``require_catalogue_read`` today, but named for its own
+    domain: Stock In both reads and writes are CEO+Seller, and the legacy admin
+    is admitted transitionally so its ``product.quantity`` flow keeps working
+    until Sales is migrated. Remove the ``is_superuser`` branch when the legacy
+    world retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+def require_sales_actor(current_user: CurrentUser) -> User:
+    """Allow recording / reading Sales (and sale returns): CEO or Seller (spec,
+    §9) or the legacy admin (transitional).
+
+    Same shape as ``require_stock_in_actor``. Remove the ``is_superuser``
+    branch when the legacy world (Dashboard/Reports on product.quantity)
+    retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
 RequireCatalogueRead = Annotated[User, Depends(require_catalogue_read)]
 RequireCatalogueManage = Annotated[User, Depends(require_catalogue_manage)]
+RequireStockInActor = Annotated[User, Depends(require_stock_in_actor)]
+RequireSalesActor = Annotated[User, Depends(require_sales_actor)]
