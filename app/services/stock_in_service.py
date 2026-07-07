@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.crud.product import product as product_crud
@@ -26,28 +25,18 @@ from app.crud.supplier import supplier as supplier_crud
 from app.models.enums import AuditAction, MovementType
 from app.models.stock_in import StockIn, StockInItem
 from app.schemas.stock_in import StockInCreate
-from app.services import audit_service, inventory_service
+from app.services import audit_service, document_sequence_service, inventory_service
 from app.utils.exceptions import NotFoundError, ValidationError
-from app.utils.reference import generate_reference
 
 _CENT = Decimal("0.01")
 
 
 def _next_reference(db: Session, company_id: int | None) -> str:
-    """Generate the next stock-in reference for a company.
-
-    Isolated behind this helper so it can later be replaced by a proper
-    sequence-based numbering service without touching the business logic below.
-    (The current count-based scheme can collide under high concurrency — see the
-    Phase 8 plan; a sequence table is the intended future replacement.)
-    """
-    stmt = select(func.count(StockIn.id))
-    if company_id is None:
-        stmt = stmt.where(StockIn.company_id.is_(None))
-    else:
-        stmt = stmt.where(StockIn.company_id == company_id)
-    count = db.execute(stmt).scalar_one()
-    return generate_reference("IN", count + 1)
+    """Generate the next stock-in reference for a company (concurrency-safe:
+    see ``document_sequence_service``)."""
+    return document_sequence_service.next_reference(
+        db, scope_type="stock_in", scope_id=company_id, prefix="IN"
+    )
 
 
 def create_stock_in(

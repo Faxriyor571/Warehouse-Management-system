@@ -11,6 +11,7 @@ from app.models.category import Category
 from app.models.company import Company
 from app.models.customer import Customer
 from app.models.debt import Debt, DebtPayment
+from app.models.document_sequence import DocumentSequence
 from app.models.enums import (
     AuditAction,
     CompanyStatus,
@@ -48,6 +49,7 @@ __all__ = [
     "Customer",
     "Debt",
     "DebtPayment",
+    "DocumentSequence",
     "Expense",
     "Payment",
     "PaymentMethod",

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.crud.customer import customer as customer_crud
@@ -43,43 +42,31 @@ from app.models.sales_return import SalesReturn, SalesReturnItem
 from app.models.stock_out import StockOut, StockOutItem
 from app.schemas.sales_return import SalesReturnCreate
 from app.schemas.stock_out import StockOutCreate
-from app.services import audit_service, debt_service, inventory_service
+from app.services import audit_service, debt_service, document_sequence_service, inventory_service
 from app.utils.exceptions import (
     InsufficientStockError,
     NotFoundError,
     ValidationError,
 )
-from app.utils.reference import generate_reference
 
 _CENT = Decimal("0.01")
 
 
 def _next_reference(db: Session, store_id: int | None) -> str:
-    """Generate the next sale reference for a store.
-
-    Isolated behind this helper so it can later be replaced by a proper
-    sequence-based numbering service without touching the business logic
-    below. Scoped by ``store_id`` (not company) per DATABASE_DESIGN.md §6 —
-    sale references are unique within their store.
+    """Generate the next sale reference for a store (concurrency-safe: see
+    ``document_sequence_service``). Scoped by ``store_id`` (not company) per
+    DATABASE_DESIGN.md §6 — sale references are unique within their store.
     """
-    stmt = select(func.count(StockOut.id))
-    if store_id is None:
-        stmt = stmt.where(StockOut.store_id.is_(None))
-    else:
-        stmt = stmt.where(StockOut.store_id == store_id)
-    count = db.execute(stmt).scalar_one()
-    return generate_reference("OUT", count + 1)
+    return document_sequence_service.next_reference(
+        db, scope_type="sale", scope_id=store_id, prefix="OUT"
+    )
 
 
 def _next_return_reference(db: Session, store_id: int | None) -> str:
     """Generate the next sale-return reference for a store (same scheme)."""
-    stmt = select(func.count(SalesReturn.id))
-    if store_id is None:
-        stmt = stmt.where(SalesReturn.store_id.is_(None))
-    else:
-        stmt = stmt.where(SalesReturn.store_id == store_id)
-    count = db.execute(stmt).scalar_one()
-    return generate_reference("RET", count + 1)
+    return document_sequence_service.next_reference(
+        db, scope_type="sales_return", scope_id=store_id, prefix="RET"
+    )
 
 
 def create_stock_out(
