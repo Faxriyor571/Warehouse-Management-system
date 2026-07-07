@@ -95,7 +95,7 @@ def create_stock_out(
     """Create a sale, decrease inventory and handle payments/debt."""
     customer = None
     if data.customer_id is not None:
-        customer = customer_crud.get(db, data.customer_id)
+        customer = customer_crud.get_for_company(db, data.customer_id, company_id)
         if customer is None:
             raise NotFoundError(f"Mijoz (id={data.customer_id}) topilmadi")
 
@@ -152,7 +152,7 @@ def create_stock_out(
     paid_amount = Decimal("0")
     valid_payments: list[tuple[int, Decimal, str | None]] = []
     for pay in data.payments:
-        method = pm_crud.get(db, pay.payment_method_id)
+        method = pm_crud.get_for_company(db, pay.payment_method_id, company_id)
         if method is None:
             raise NotFoundError(f"To'lov turi (id={pay.payment_method_id}) topilmadi")
         if method.type == PaymentMethodType.DEBT:

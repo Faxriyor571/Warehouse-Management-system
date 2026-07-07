@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import security
 from app.crud.company import company as company_crud
+from app.crud.payment_method import payment_method as pm_crud
 from app.models.company import Company
 from app.models.enums import CompanyStatus, UserRole
 from app.models.refresh_token import RefreshToken
@@ -49,6 +50,10 @@ def create_company(db: Session, data: CompanyCreate) -> tuple[Company, User]:
         is_active=True,
     )
     db.add(ceo)
+
+    # System payment methods (DATABASE_DESIGN.md §3.18: "seeded per company").
+    pm_crud.seed_defaults_for_company(db, company_id=company.id)
+
     db.commit()
     db.refresh(company)
     db.refresh(ceo)

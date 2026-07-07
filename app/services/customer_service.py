@@ -1,4 +1,5 @@
-"""Customer-related aggregation: debt summary and purchase history."""
+"""Customer business logic: creation/update rules, debt summary and purchase
+history aggregation, and deactivation (API_SPECIFICATION.md §10)."""
 from __future__ import annotations
 
 from decimal import Decimal
@@ -6,42 +7,133 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.crud.customer import customer as customer_crud
+from app.models.customer import Customer
 from app.models.debt import Debt
-from app.models.enums import DebtStatus
+from app.models.enums import AuditAction, DebtStatus
 from app.models.stock_out import StockOut
 from app.schemas.customer import (
+    CustomerCreate,
     CustomerDebtSummary,
+    CustomerUpdate,
     PurchaseHistoryItem,
 )
+from app.services import audit_service
+from app.utils.exceptions import ConflictError, ValidationError
 
 _ZERO = Decimal("0")
 
 
-def get_debt_summary(db: Session, customer_id: int) -> CustomerDebtSummary:
-    """Aggregate a customer's debts."""
+def create_customer(
+    db: Session,
+    data: CustomerCreate,
+    *,
+    company_id: int | None,
+    user_id: int,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> Customer:
+    """Create a customer. ``customer_type`` is required for a tenant actor
+    (company_id is not None); the legacy single-tenant flow may omit it."""
+    if company_id is not None and data.customer_type is None:
+        raise ValidationError("customer_type majburiy (individual yoki legal_entity)")
+
+    payload = data.model_dump()
+    payload["company_id"] = company_id
+    obj = customer_crud.create(db, payload)
+
+    audit_service.log_action(
+        db,
+        action=AuditAction.CREATE,
+        user_id=user_id,
+        entity_type="customer",
+        entity_id=obj.id,
+        description=f"Mijoz qo'shildi: {obj.full_name}",
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return obj
+
+
+def update_customer(
+    db: Session,
+    obj: Customer,
+    data: CustomerUpdate,
+    *,
+    user_id: int,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> Customer:
+    updated = customer_crud.update(db, obj, data.model_dump(exclude_unset=True))
+    audit_service.log_action(
+        db,
+        action=AuditAction.UPDATE,
+        user_id=user_id,
+        entity_type="customer",
+        entity_id=updated.id,
+        description=f"Mijoz yangilandi: {updated.full_name}",
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return updated
+
+
+def deactivate_customer(
+    db: Session,
+    obj: Customer,
+    *,
+    user_id: int,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> Customer:
+    """Soft-delete a customer. Blocked (409) while any debt remains
+    outstanding (API_SPECIFICATION.md §10)."""
+    summary = get_debt_summary(db, obj.id)
+    if summary.remaining > 0:
+        raise ConflictError(
+            "Qoldiq qarzi bor mijozni faolsizlantirib bo'lmaydi: avval qarzni yoping"
+        )
+
+    customer_crud.remove(db, obj)
+    audit_service.log_action(
+        db,
+        action=AuditAction.DELETE,
+        user_id=user_id,
+        entity_type="customer",
+        entity_id=obj.id,
+        description=f"Mijoz faolsizlantirildi: {obj.full_name}",
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return obj
+
+
+def get_debt_summary(
+    db: Session, customer_id: int, *, store_id: int | None = None
+) -> CustomerDebtSummary:
+    """Aggregate a customer's debts, optionally filtered to one store (Seller)."""
+    filters = [Debt.customer_id == customer_id]
+    if store_id is not None:
+        filters.append(Debt.store_id == store_id)
+
     totals = db.execute(
         select(
             func.coalesce(func.sum(Debt.amount), 0),
             func.coalesce(func.sum(Debt.paid_amount), 0),
             func.coalesce(func.sum(Debt.remaining_amount), 0),
-        ).where(Debt.customer_id == customer_id)
+        ).where(*filters)
     ).one()
 
     active_count = int(
         db.execute(
             select(func.count(Debt.id)).where(
-                Debt.customer_id == customer_id,
-                Debt.status == DebtStatus.ACTIVE,
-                Debt.remaining_amount > 0,
+                *filters, Debt.status == DebtStatus.ACTIVE, Debt.remaining_amount > 0
             )
         ).scalar_one()
     )
     overdue_count = int(
         db.execute(
-            select(func.count(Debt.id)).where(
-                Debt.customer_id == customer_id,
-                Debt.status == DebtStatus.OVERDUE,
-            )
+            select(func.count(Debt.id)).where(*filters, Debt.status == DebtStatus.OVERDUE)
         ).scalar_one()
     )
 
@@ -55,15 +147,17 @@ def get_debt_summary(db: Session, customer_id: int) -> CustomerDebtSummary:
 
 
 def get_purchase_history(
-    db: Session, customer_id: int, limit: int = 50
+    db: Session, customer_id: int, *, store_id: int | None = None, limit: int = 50
 ) -> list[PurchaseHistoryItem]:
-    """Return a customer's most recent sales."""
+    """Return a customer's most recent sales, optionally filtered to one
+    store (Seller)."""
+    filters = [StockOut.customer_id == customer_id]
+    if store_id is not None:
+        filters.append(StockOut.store_id == store_id)
+
     rows = (
         db.execute(
-            select(StockOut)
-            .where(StockOut.customer_id == customer_id)
-            .order_by(StockOut.date.desc())
-            .limit(limit)
+            select(StockOut).where(*filters).order_by(StockOut.date.desc()).limit(limit)
         )
         .scalars()
         .all()

@@ -86,7 +86,64 @@ def require_sales_actor(current_user: CurrentUser) -> User:
     raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
 
 
+def require_customer_actor(current_user: CurrentUser) -> User:
+    """Allow recording / reading Customers: CEO or Seller (spec, §10) or the
+    legacy admin (transitional). Company-wide for both — Customers has no
+    store scope. Remove the ``is_superuser`` branch when the legacy world
+    retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+def require_customer_manage(current_user: CurrentUser) -> User:
+    """Allow deactivating a Customer: CEO (spec, §10) or the legacy admin
+    (transitional). Remove the ``is_superuser`` branch when the legacy world
+    retires.
+    """
+    if current_user.role == UserRole.CEO:
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
+
+
+def require_payment_method_read(current_user: CurrentUser) -> User:
+    """Allow reading Payment Methods: CEO or Seller (a Seller must be able to
+    pick one at sale time) or the legacy admin (transitional). No dedicated
+    API_SPECIFICATION.md section exists for this module; this mirrors the
+    Settings access split (CEO manages, company-scoped) as the most
+    conservative reading consistent with DATABASE_DESIGN.md §3.18/§6. Remove
+    the ``is_superuser`` branch when the legacy world retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+def require_payment_method_manage(current_user: CurrentUser) -> User:
+    """Allow managing Payment Methods: CEO only (or the legacy admin,
+    transitional). See ``require_payment_method_read`` for the access-model
+    rationale. Remove the ``is_superuser`` branch when the legacy world
+    retires.
+    """
+    if current_user.role == UserRole.CEO:
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
+
+
 RequireCatalogueRead = Annotated[User, Depends(require_catalogue_read)]
 RequireCatalogueManage = Annotated[User, Depends(require_catalogue_manage)]
 RequireStockInActor = Annotated[User, Depends(require_stock_in_actor)]
 RequireSalesActor = Annotated[User, Depends(require_sales_actor)]
+RequireCustomerActor = Annotated[User, Depends(require_customer_actor)]
+RequireCustomerManage = Annotated[User, Depends(require_customer_manage)]
+RequirePaymentMethodRead = Annotated[User, Depends(require_payment_method_read)]
+RequirePaymentMethodManage = Annotated[User, Depends(require_payment_method_manage)]

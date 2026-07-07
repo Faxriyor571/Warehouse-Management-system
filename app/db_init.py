@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import security
 from app.config import settings
+from app.crud.payment_method import payment_method as pm_crud
 from app.database import Base, SessionLocal, engine
-from app.models.enums import PaymentMethodType, RoleName
-from app.models.payment_method import PaymentMethod
+from app.models.enums import RoleName
 from app.models.role import Permission, Role
 from app.models.unit import Unit
 from app.models.user import User
@@ -28,15 +28,6 @@ from app.permissions.constants import (
 )
 
 logger = logging.getLogger("wms.init")
-
-# Default payment methods: (name, type)
-_DEFAULT_PAYMENT_METHODS: list[tuple[str, PaymentMethodType]] = [
-    ("Naqd", PaymentMethodType.CASH),
-    ("Click", PaymentMethodType.CLICK),
-    ("Payme", PaymentMethodType.PAYME),
-    ("Bank", PaymentMethodType.BANK),
-    ("Qarz", PaymentMethodType.DEBT),
-]
 
 # Default units: (name, short_name)
 _DEFAULT_UNITS: list[tuple[str, str]] = [
@@ -112,10 +103,10 @@ def seed_admin(db: Session, roles: dict[str, Role]) -> None:
 
 
 def seed_payment_methods(db: Session) -> None:
-    existing = {pm.name for pm in db.execute(select(PaymentMethod)).scalars().all()}
-    for name, type_ in _DEFAULT_PAYMENT_METHODS:
-        if name not in existing:
-            db.add(PaymentMethod(name=name, type=type_, is_active=True, is_system=True))
+    """Seed the 5 system methods for the legacy single-tenant scope
+    (``company_id=None``). Tenant companies get their own copy at onboarding
+    (``company_service.create_company``)."""
+    pm_crud.seed_defaults_for_company(db, company_id=None)
     db.commit()
 
 

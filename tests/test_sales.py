@@ -8,10 +8,12 @@ transitional legacy admin, covered by test_stock_flow); Super Admin has no
 access. Reference numbering is scoped **per store** (not per company, unlike
 Stock In) per DATABASE_DESIGN.md §6.
 
-Customers and Payment Methods are not migrated in this phase, so their own
-endpoints still gate on the legacy RBAC permission system and are unreachable
-by a CEO/Seller token; tests create/read those rows directly via ``db_session``
-(a pre-existing gap outside Sales' scope — see the Phase 9 self-review note).
+Payment Methods and Customers are both company-scoped (Phase 10): each
+onboarded company gets its own seeded payment methods, and both
+``payment_method_id`` and ``customer_id`` are now company-scoped lookups in
+Sales (a tenant-isolation fix, not a new feature) — so both helpers below
+(``_cash_method_id``, ``_customer``) resolve/create within the CEO's own
+company rather than the legacy NULL scope.
 """
 from __future__ import annotations
 
@@ -19,9 +21,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.auth import security
+from app.crud.company import company as company_crud
 from app.crud.payment_method import payment_method as pm_crud
-from app.models.customer import Customer
-from app.models.enums import CustomerType, PaymentMethodType, UserRole
+from app.models.enums import PaymentMethodType, UserRole
 from app.models.user import User
 
 
@@ -114,18 +116,26 @@ def _store_qty(client: TestClient, headers: dict[str, str], store_id: int | None
     return None
 
 
-def _customer(db: Session, full_name: str, customer_type: CustomerType | None = None) -> int:
-    """Customers has no CEO/Seller-reachable endpoint in this phase; create
-    directly, same as the Company/Store/User precedent in test_stock_in.py."""
-    c = Customer(full_name=full_name, customer_type=customer_type, is_active=True)
-    db.add(c)
-    db.commit()
-    db.refresh(c)
-    return c.id
+def _customer(client: TestClient, ceo: dict[str, str], full_name: str, customer_type: str = "individual") -> int:
+    """Customers is company-scoped (Phase 10); create through the real
+    endpoint so the customer lands in the CEO's own company — a raw
+    ``db_session`` insert would default to the legacy NULL-company scope and
+    fail the (correct) company-scoped customer_id check in Sales."""
+    resp = client.post(
+        "/api/v1/customers", headers=ceo, json={"full_name": full_name, "customer_type": customer_type}
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
 
 
-def _cash_method_id(db: Session) -> int:
-    method = pm_crud.get_by_type(db, PaymentMethodType.CASH)
+def _company_id(db: Session, slug: str) -> int:
+    company = company_crud.get_by_slug(db, slug)
+    assert company is not None
+    return company.id
+
+
+def _cash_method_id(db: Session, company_id: int) -> int:
+    method = pm_crud.get_by_type_for_company(db, PaymentMethodType.CASH, company_id)
     assert method is not None
     return method.id
 
@@ -138,7 +148,7 @@ def test_ceo_cash_sale_decreases_store_stock(client: TestClient, db_session: Ses
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SA")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-a"))
 
     resp = client.post(
         "/api/v1/sales",
@@ -166,8 +176,8 @@ def test_partial_payment_creates_scoped_debt(client: TestClient, db_session: Ses
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SB")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
-    customer_id = _customer(db_session, "Ali")
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-b"))
+    customer_id = _customer(client, ceo, "Ali")
 
     resp = client.post(
         "/api/v1/sales",
@@ -229,8 +239,8 @@ def test_price_override_allowed_for_legal_entity(client: TestClient, db_session:
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SE", sale_price="15.00")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
-    customer_id = _customer(db_session, "Yuridik", customer_type=CustomerType.LEGAL_ENTITY)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-e"))
+    customer_id = _customer(client, ceo, "Yuridik", customer_type="legal_entity")
 
     resp = client.post(
         "/api/v1/sales",
@@ -251,8 +261,8 @@ def test_price_override_rejected_for_individual(client: TestClient, db_session: 
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SF", sale_price="15.00")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
-    customer_id = _customer(db_session, "Jismoniy")  # customer_type=None (Individual)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-f"))
+    customer_id = _customer(client, ceo, "Jismoniy", customer_type="individual")
 
     resp = client.post(
         "/api/v1/sales",
@@ -272,7 +282,7 @@ def test_price_override_rejected_without_customer(client: TestClient, db_session
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SG", sale_price="15.00")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-g"))
 
     resp = client.post(
         "/api/v1/sales",
@@ -297,7 +307,7 @@ def test_seller_sale_uses_own_store(client: TestClient, db_session: Session) -> 
     _stock_in(client, ceo, own, product_id, "50")
     _stock_in(client, ceo, other, product_id, "50")
     seller = _seller(client, ceo, "sa-h", "seller-sa-h", own)
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-h"))
 
     resp = client.post(
         "/api/v1/sales",
@@ -327,7 +337,7 @@ def test_cross_company_detail_404(client: TestClient, db_session: Session) -> No
     store_b = _store(client, ceo_b)
     product_b = _product(client, ceo_b, "SKU-SJ")
     _stock_in(client, ceo_b, store_b, product_b, "10")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-j2"))
     sale_b = client.post(
         "/api/v1/sales",
         headers=ceo_b,
@@ -353,7 +363,7 @@ def test_reference_numbering_per_store_within_same_company(client: TestClient, d
     product_id = _product(client, ceo, "SKU-SK")
     _stock_in(client, ceo, store_1, product_id, "10")
     _stock_in(client, ceo, store_2, product_id, "10")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-k"))
 
     r1 = client.post(
         "/api/v1/sales",
@@ -374,7 +384,7 @@ def test_dual_mount_stock_out_and_sales_are_the_same_endpoint(client: TestClient
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SL")
     _stock_in(client, ceo, store_id, product_id, "10")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-l"))
 
     resp = client.post(
         "/api/v1/stock-out",
@@ -396,8 +406,8 @@ def test_sales_return_restores_inventory_and_reduces_debt(client: TestClient, db
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SM")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
-    customer_id = _customer(db_session, "Vali")
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-m"))
+    customer_id = _customer(client, ceo, "Vali")
 
     sale = client.post(
         "/api/v1/sales",
@@ -441,7 +451,7 @@ def test_sales_return_over_return_rejected(client: TestClient, db_session: Sessi
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SN")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-n"))
 
     sale = client.post(
         "/api/v1/sales",
@@ -467,7 +477,7 @@ def test_sales_return_cross_sale_line_rejected(client: TestClient, db_session: S
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SO")
     _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session)
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-o"))
 
     sale_1 = client.post(
         "/api/v1/sales",

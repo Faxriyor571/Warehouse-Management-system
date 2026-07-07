@@ -72,7 +72,7 @@ def add_payment(
     """Record a repayment toward a debt and update balances/status."""
     if debt.status == DebtStatus.PAID or debt.remaining_amount <= 0:
         raise ValidationError("Bu qarz allaqachon to'liq to'langan")
-    if pm_crud.get(db, data.payment_method_id) is None:
+    if pm_crud.get_for_company(db, data.payment_method_id, debt.company_id) is None:
         raise NotFoundError(f"To'lov turi (id={data.payment_method_id}) topilmadi")
     if data.amount > debt.remaining_amount:
         raise ValidationError(
