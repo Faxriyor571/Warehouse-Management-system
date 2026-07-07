@@ -217,3 +217,19 @@ def require_reports_actor(current_user: CurrentUser) -> User:
 
 
 RequireReportsActor = Annotated[User, Depends(require_reports_actor)]
+
+
+def require_settings_manage(current_user: CurrentUser) -> User:
+    """Allow reading / writing Settings: CEO (spec, §15) or the legacy admin
+    (transitional). Seller has no access; the multi-tenant Super Admin is
+    excluded too (it has ``is_superuser=False``). Remove the ``is_superuser``
+    branch when the legacy world retires.
+    """
+    if current_user.role == UserRole.CEO:
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
+
+
+RequireSettingsManage = Annotated[User, Depends(require_settings_manage)]
