@@ -30,8 +30,11 @@ from app.models.user import User
 from app.utils.exceptions import PermissionDeniedError
 
 
-def require_category_read(current_user: CurrentUser) -> User:
-    """Allow a catalogue read: CEO/Seller (spec) or the legacy admin (transitional)."""
+def require_catalogue_read(current_user: CurrentUser) -> User:
+    """Allow a catalogue read: CEO/Seller (spec) or the legacy admin (transitional).
+
+    Used by every catalogue module (categories, units, products).
+    """
     if current_user.role in (UserRole.CEO, UserRole.SELLER):
         return current_user
     if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
@@ -39,8 +42,11 @@ def require_category_read(current_user: CurrentUser) -> User:
     raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
 
 
-def require_category_manage(current_user: CurrentUser) -> User:
-    """Allow a catalogue write: CEO (spec) or the legacy admin (transitional)."""
+def require_catalogue_manage(current_user: CurrentUser) -> User:
+    """Allow a catalogue write: CEO (spec) or the legacy admin (transitional).
+
+    Used by every catalogue module (categories, units, products).
+    """
     if current_user.role == UserRole.CEO:
         return current_user
     if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
@@ -48,5 +54,5 @@ def require_category_manage(current_user: CurrentUser) -> User:
     raise PermissionDeniedError("Faqat kompaniya rahbari (CEO) uchun")
 
 
-RequireCategoryRead = Annotated[User, Depends(require_category_read)]
-RequireCategoryManage = Annotated[User, Depends(require_category_manage)]
+RequireCatalogueRead = Annotated[User, Depends(require_catalogue_read)]
+RequireCatalogueManage = Annotated[User, Depends(require_catalogue_manage)]

@@ -12,7 +12,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, status
 
 from app.auth.dependencies import DbSession
-from app.auth.legacy_compat import RequireCategoryManage, RequireCategoryRead
+from app.auth.legacy_compat import RequireCatalogueManage, RequireCatalogueRead
 from app.crud.category import category as category_crud
 from app.models.category import Category
 from app.schemas.category import CategoryCreate, CategoryOut, CategoryUpdate
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 @router.get("", response_model=PaginatedResponse[CategoryOut], summary="Kategoriyalar ro'yxati")
 def list_categories(
     db: DbSession,
-    current_user: RequireCategoryRead,
+    current_user: RequireCatalogueRead,
     search: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
@@ -46,13 +46,13 @@ def list_categories(
     summary="Kategoriya qo'shish",
 )
 def create_category(
-    db: DbSession, current_user: RequireCategoryManage, data: CategoryCreate
+    db: DbSession, current_user: RequireCatalogueManage, data: CategoryCreate
 ) -> Category:
     return category_service.create_category(db, current_user.company_id, data)
 
 
 @router.get("/{category_id}", response_model=CategoryOut, summary="Kategoriya ma'lumoti")
-def get_category(db: DbSession, current_user: RequireCategoryRead, category_id: int) -> Category:
+def get_category(db: DbSession, current_user: RequireCatalogueRead, category_id: int) -> Category:
     category = category_crud.get_for_company(db, category_id, current_user.company_id)
     if category is None:
         raise NotFoundError(f"Kategoriya (id={category_id}) topilmadi")
@@ -61,7 +61,7 @@ def get_category(db: DbSession, current_user: RequireCategoryRead, category_id: 
 
 @router.put("/{category_id}", response_model=CategoryOut, summary="Kategoriyani yangilash")
 def update_category(
-    db: DbSession, current_user: RequireCategoryManage, category_id: int, data: CategoryUpdate
+    db: DbSession, current_user: RequireCatalogueManage, category_id: int, data: CategoryUpdate
 ) -> Category:
     category = category_crud.get_for_company(db, category_id, current_user.company_id)
     if category is None:
@@ -71,7 +71,7 @@ def update_category(
 
 @router.delete("/{category_id}", response_model=Message, summary="Kategoriyani o'chirish")
 def delete_category(
-    db: DbSession, current_user: RequireCategoryManage, category_id: int
+    db: DbSession, current_user: RequireCatalogueManage, category_id: int
 ) -> Message:
     category = category_crud.get_for_company(db, category_id, current_user.company_id)
     if category is None:
