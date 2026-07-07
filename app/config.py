@@ -9,8 +9,12 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Sentinel defaults that must never reach a production deployment.
+_DEFAULT_SECRET_KEY = "CHANGE_ME"
+_DEFAULT_ADMIN_PASSWORD = "Admin12345!"
 
 # Project root directory (…/wms)
 BASE_DIR: Path = Path(__file__).resolve().parent.parent
@@ -41,10 +45,14 @@ class Settings(BaseSettings):
     postgres_db: str = Field(default="wms_db")
 
     # --- Security ---
-    secret_key: str = Field(default="CHANGE_ME")
+    secret_key: str = Field(default=_DEFAULT_SECRET_KEY)
     access_token_expire_minutes: int = Field(default=60)
     refresh_token_expire_days: int = Field(default=7)
     algorithm: str = Field(default="HS256")
+
+    # --- CORS ---
+    # Comma-separated list of allowed origins, or "*" (development only).
+    cors_origins: str = Field(default="*")
 
     # --- Session cookie ---
     session_cookie_name: str = Field(default="wms_session")
@@ -56,7 +64,7 @@ class Settings(BaseSettings):
 
     # --- First admin (seed) ---
     first_admin_username: str = Field(default="admin")
-    first_admin_password: str = Field(default="Admin12345!")
+    first_admin_password: str = Field(default=_DEFAULT_ADMIN_PASSWORD)
     first_admin_fullname: str = Field(default="Bosh Administrator")
 
     # ------------------------------------------------------------------
@@ -92,6 +100,47 @@ class Settings(BaseSettings):
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """Parsed CORS origins: ``["*"]`` or a list of explicit origins."""
+        if self.cors_origins.strip() == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    # ------------------------------------------------------------------
+    # Production safety gate
+    # ------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _reject_insecure_production_config(self) -> "Settings":
+        """Fail fast at startup if APP_ENV=production keeps any dev default.
+
+        Runs at ``Settings()`` construction time (i.e. on import of this
+        module), so a misconfigured production process refuses to start
+        rather than run with insecure defaults.
+        """
+        if self.app_env.lower() != "production":
+            return self
+
+        errors: list[str] = []
+        if self.secret_key == _DEFAULT_SECRET_KEY:
+            errors.append("SECRET_KEY must be set to a strong random value (not the default).")
+        if self.debug:
+            errors.append("DEBUG must be false in production.")
+        if self.first_admin_password == _DEFAULT_ADMIN_PASSWORD:
+            errors.append("FIRST_ADMIN_PASSWORD must be changed from the default value.")
+        if "*" in self.cors_origin_list:
+            errors.append(
+                "CORS_ORIGINS must not include a wildcard '*' in production "
+                "(found in: " + self.cors_origins + "); set explicit allowed origins."
+            )
+        if errors:
+            raise ValueError(
+                "Refusing to start: insecure configuration for APP_ENV=production:\n- "
+                + "\n- ".join(errors)
+            )
+        return self
 
 
 @lru_cache
