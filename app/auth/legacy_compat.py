@@ -187,3 +187,18 @@ def require_expense_actor(current_user: CurrentUser) -> User:
 
 
 RequireExpenseActor = Annotated[User, Depends(require_expense_actor)]
+
+
+def require_dashboard_actor(current_user: CurrentUser) -> User:
+    """Allow reading the Dashboard: CEO or Seller (spec, §13) or the legacy
+    admin (transitional). Remove the ``is_superuser`` branch when the legacy
+    world retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+RequireDashboardActor = Annotated[User, Depends(require_dashboard_actor)]
