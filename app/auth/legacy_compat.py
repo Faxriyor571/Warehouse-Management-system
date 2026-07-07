@@ -202,3 +202,18 @@ def require_dashboard_actor(current_user: CurrentUser) -> User:
 
 
 RequireDashboardActor = Annotated[User, Depends(require_dashboard_actor)]
+
+
+def require_reports_actor(current_user: CurrentUser) -> User:
+    """Allow reading Reports: CEO or Seller (spec, §14) or the legacy admin
+    (transitional). Remove the ``is_superuser`` branch when the legacy world
+    retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+RequireReportsActor = Annotated[User, Depends(require_reports_actor)]

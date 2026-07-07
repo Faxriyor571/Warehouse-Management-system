@@ -1,86 +1,70 @@
-"""Reporting schemas."""
+"""Reporting schemas (API_SPECIFICATION.md §14 — JSON only, 4 report types)."""
 from __future__ import annotations
 
-# The date type is imported under an alias: some rows have a field literally
-# named ``date`` (e.g. SalesReportRow.date), and under
-# ``from __future__ import annotations`` Pydantic v2 resolves annotations with
-# the class namespace as locals, so a field named ``date`` could shadow the
-# ``date`` type. Using ``date_type`` avoids that shadowing entirely.
-from datetime import date as date_type
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
 
-class DateRange(BaseModel):
-    """A start/end date range used for report filtering."""
-
-    date_from: date_type | None = None
-    date_to: date_type | None = None
+class ChartPoint(BaseModel):
+    label: str
+    value: Decimal
 
 
-class SalesReportRow(BaseModel):
-    reference: str
-    date: date_type
-    customer: str | None = None
-    total_amount: Decimal
-    paid_amount: Decimal
-    payment_status: str
+# --- Sales ---------------------------------------------------------------
+class PaymentStatusBucket(BaseModel):
+    status: str  # paid | partial | unpaid
+    count: int
+    revenue: Decimal
 
 
 class SalesReport(BaseModel):
-    rows: list[SalesReportRow] = Field(default_factory=list)
-    total_amount: Decimal
-    total_paid: Decimal
-    count: int
+    total_revenue: Decimal
+    total_count: int
+    by_payment_status: list[PaymentStatusBucket] = Field(default_factory=list)
+    by_day: list[ChartPoint] = Field(default_factory=list)
 
 
-class PurchaseReportRow(BaseModel):
-    reference: str
-    date: date_type
-    supplier: str | None = None
-    total_amount: Decimal
-
-
-class PurchaseReport(BaseModel):
-    rows: list[PurchaseReportRow] = Field(default_factory=list)
-    total_amount: Decimal
-    count: int
-
-
-class DebtReportRow(BaseModel):
-    customer: str
-    phone: str | None = None
-    amount: Decimal
-    paid_amount: Decimal
-    remaining_amount: Decimal
-    status: str
-    due_date: date_type | None = None
-
-
-class DebtReport(BaseModel):
-    rows: list[DebtReportRow] = Field(default_factory=list)
-    total_remaining: Decimal
-    count: int
-
-
+# --- Inventory (current store_stock levels, by product) ------------------
 class InventoryReportRow(BaseModel):
-    sku: str
+    product_id: int
     name: str
+    sku: str
     quantity: Decimal
-    purchase_price: Decimal
-    sale_price: Decimal
-    stock_value: Decimal
 
 
 class InventoryReport(BaseModel):
     rows: list[InventoryReportRow] = Field(default_factory=list)
-    total_stock_value: Decimal
     count: int
 
 
-class ProfitReport(BaseModel):
-    revenue: Decimal
-    cost_of_goods: Decimal
-    gross_profit: Decimal
+# --- Debts (outstanding, grouped by customer and by status) --------------
+class DebtByCustomer(BaseModel):
+    customer_id: int
+    full_name: str
+    remaining: Decimal
+
+
+class DebtByStatus(BaseModel):
+    status: str  # active | overdue
     count: int
+    remaining: Decimal
+
+
+class DebtReport(BaseModel):
+    by_customer: list[DebtByCustomer] = Field(default_factory=list)
+    by_status: list[DebtByStatus] = Field(default_factory=list)
+    total_remaining: Decimal
+
+
+# --- Expenses (totals grouped by expense_type and by date) ---------------
+class ExpenseByType(BaseModel):
+    expense_type: str
+    total: Decimal
+    count: int
+
+
+class ExpenseReport(BaseModel):
+    by_type: list[ExpenseByType] = Field(default_factory=list)
+    by_date: list[ChartPoint] = Field(default_factory=list)
+    total: Decimal

@@ -1,4 +1,9 @@
-"""Reporting logic: sales, purchases, debts, inventory and profit."""
+"""Reporting logic (API_SPECIFICATION.md §14 — sales, inventory, debts, expenses).
+
+Read-only aggregation, company/store scoped. Reuses the Dashboard scope helper
+(``dashboard_service._scope_filters``) and the store-stock CRUD so tenant
+isolation and the store-stock listing are not re-implemented here.
+"""
 from __future__ import annotations
 
 from datetime import date as date_type
@@ -7,161 +12,173 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.crud.store_stock import store_stock as store_stock_crud
 from app.models.customer import Customer
 from app.models.debt import Debt
-from app.models.product import Product
-from app.models.stock_in import StockIn
-from app.models.stock_out import StockOut, StockOutItem
-from app.models.supplier import Supplier
+from app.models.enums import DebtStatus
+from app.models.expense import Expense
+from app.models.stock_out import StockOut
 from app.schemas.report import (
+    ChartPoint,
+    DebtByCustomer,
+    DebtByStatus,
     DebtReport,
-    DebtReportRow,
+    ExpenseByType,
+    ExpenseReport,
     InventoryReport,
     InventoryReportRow,
-    ProfitReport,
-    PurchaseReport,
-    PurchaseReportRow,
+    PaymentStatusBucket,
     SalesReport,
-    SalesReportRow,
 )
+from app.services.dashboard_service import _scope_filters
+from app.utils.pagination import MAX_PAGE_SIZE, PageParams
 
 _ZERO = Decimal("0")
 
 
-def _apply_date_range(stmt, column, date_from: date_type | None, date_to: date_type | None):
+def _dec(value) -> Decimal:
+    return Decimal(value) if value is not None else _ZERO
+
+
+def sales_report(
+    db: Session,
+    *,
+    company_id: int | None,
+    store_id: int | None,
+    date_from: date_type | None,
+    date_to: date_type | None,
+) -> SalesReport:
+    scope = _scope_filters(StockOut, company_id, store_id)
     if date_from is not None:
-        stmt = stmt.where(func.date(column) >= date_from)
+        scope.append(func.date(StockOut.date) >= date_from)
     if date_to is not None:
-        stmt = stmt.where(func.date(column) <= date_to)
-    return stmt
+        scope.append(func.date(StockOut.date) <= date_to)
 
+    total_revenue, total_count = db.execute(
+        select(func.coalesce(func.sum(StockOut.total_amount), 0), func.count(StockOut.id)).where(*scope)
+    ).one()
 
-def sales_report(db: Session, date_from: date_type | None, date_to: date_type | None) -> SalesReport:
-    stmt = (
-        select(StockOut, Customer.full_name)
-        .join(Customer, StockOut.customer_id == Customer.id, isouter=True)
-        .order_by(StockOut.date.desc())
-    )
-    stmt = _apply_date_range(stmt, StockOut.date, date_from, date_to)
-
-    rows: list[SalesReportRow] = []
-    total_amount = _ZERO
-    total_paid = _ZERO
-    for sale, customer_name in db.execute(stmt).all():
-        rows.append(
-            SalesReportRow(
-                reference=sale.reference,
-                date=sale.date.date(),
-                customer=customer_name,
-                total_amount=sale.total_amount,
-                paid_amount=sale.paid_amount,
-                payment_status=sale.payment_status.value,
+    by_payment_status = [
+        PaymentStatusBucket(status=row.status.value, count=row.cnt, revenue=_dec(row.rev))
+        for row in db.execute(
+            select(
+                StockOut.payment_status.label("status"),
+                func.count(StockOut.id).label("cnt"),
+                func.coalesce(func.sum(StockOut.total_amount), 0).label("rev"),
             )
-        )
-        total_amount += sale.total_amount
-        total_paid += sale.paid_amount
+            .where(*scope)
+            .group_by(StockOut.payment_status)
+        ).all()
+    ]
+
+    by_day = [
+        ChartPoint(label=str(row.d), value=_dec(row.total))
+        for row in db.execute(
+            select(
+                func.date(StockOut.date).label("d"),
+                func.coalesce(func.sum(StockOut.total_amount), 0).label("total"),
+            )
+            .where(*scope)
+            .group_by(func.date(StockOut.date))
+            .order_by(func.date(StockOut.date).asc())
+        ).all()
+    ]
 
     return SalesReport(
-        rows=rows, total_amount=total_amount, total_paid=total_paid, count=len(rows)
+        total_revenue=_dec(total_revenue),
+        total_count=int(total_count or 0),
+        by_payment_status=by_payment_status,
+        by_day=by_day,
     )
 
 
-def purchase_report(db: Session, date_from: date_type | None, date_to: date_type | None) -> PurchaseReport:
-    stmt = (
-        select(StockIn, Supplier.name)
-        .join(Supplier, StockIn.supplier_id == Supplier.id, isouter=True)
-        .order_by(StockIn.date.desc())
-    )
-    stmt = _apply_date_range(stmt, StockIn.date, date_from, date_to)
+def inventory_report(db: Session, *, company_id: int | None, store_id: int | None) -> InventoryReport:
+    # store_stock is a tenant model; the legacy (NULL-company) scope has no
+    # store rows, so its report is empty (its stock lives in product.quantity).
+    if company_id is None:
+        return InventoryReport(rows=[], count=0)
 
-    rows: list[PurchaseReportRow] = []
-    total_amount = _ZERO
-    for purchase, supplier_name in db.execute(stmt).all():
-        rows.append(
-            PurchaseReportRow(
-                reference=purchase.reference,
-                date=purchase.date.date(),
-                supplier=supplier_name,
-                total_amount=purchase.total_amount,
+    params = PageParams(page=1, page_size=MAX_PAGE_SIZE)
+    if store_id is not None:
+        rows, count = store_stock_crud.list_for_store(db, store_id, page_params=params)
+    else:
+        rows, count = store_stock_crud.list_company_wide(db, company_id, page_params=params)
+
+    return InventoryReport(
+        rows=[
+            InventoryReportRow(product_id=r.product_id, name=r.product_name, sku=r.sku, quantity=r.quantity)
+            for r in rows
+        ],
+        count=count,
+    )
+
+
+def debt_report(db: Session, *, company_id: int | None, store_id: int | None) -> DebtReport:
+    scope = _scope_filters(Debt, company_id, store_id)
+    scope.append(Debt.remaining_amount > 0)  # outstanding only
+
+    by_customer = [
+        DebtByCustomer(customer_id=row.id, full_name=row.full_name, remaining=_dec(row.rem))
+        for row in db.execute(
+            select(
+                Customer.id,
+                Customer.full_name,
+                func.coalesce(func.sum(Debt.remaining_amount), 0).label("rem"),
             )
-        )
-        total_amount += purchase.total_amount
+            .join(Debt, Debt.customer_id == Customer.id)
+            .where(*scope)
+            .group_by(Customer.id, Customer.full_name)
+            .order_by(func.sum(Debt.remaining_amount).desc())
+        ).all()
+    ]
 
-    return PurchaseReport(rows=rows, total_amount=total_amount, count=len(rows))
-
-
-def debt_report(db: Session, only_open: bool = False) -> DebtReport:
-    stmt = (
-        select(Debt, Customer.full_name, Customer.phone)
-        .join(Customer, Debt.customer_id == Customer.id)
-        .order_by(Debt.due_date.asc().nulls_last())
-    )
-    if only_open:
-        stmt = stmt.where(Debt.remaining_amount > 0)
-
-    rows: list[DebtReportRow] = []
-    total_remaining = _ZERO
-    for debt, name, phone in db.execute(stmt).all():
-        rows.append(
-            DebtReportRow(
-                customer=name,
-                phone=phone,
-                amount=debt.amount,
-                paid_amount=debt.paid_amount,
-                remaining_amount=debt.remaining_amount,
-                status=debt.status.value,
-                due_date=debt.due_date,
+    by_status = [
+        DebtByStatus(status=row.status.value, count=row.cnt, remaining=_dec(row.rem))
+        for row in db.execute(
+            select(
+                Debt.status.label("status"),
+                func.count(Debt.id).label("cnt"),
+                func.coalesce(func.sum(Debt.remaining_amount), 0).label("rem"),
             )
-        )
-        total_remaining += debt.remaining_amount
+            .where(*scope, Debt.status.in_((DebtStatus.ACTIVE, DebtStatus.OVERDUE)))
+            .group_by(Debt.status)
+        ).all()
+    ]
 
-    return DebtReport(rows=rows, total_remaining=total_remaining, count=len(rows))
-
-
-def inventory_report(db: Session) -> InventoryReport:
-    stmt = (
-        select(Product)
-        .where(Product.deleted_at.is_(None))
-        .order_by(Product.name.asc())
+    total_remaining = _dec(
+        db.execute(select(func.coalesce(func.sum(Debt.remaining_amount), 0)).where(*scope)).scalar()
     )
-    rows: list[InventoryReportRow] = []
-    total_value = _ZERO
-    for product in db.execute(stmt).scalars().all():
-        value = (product.quantity * product.purchase_price).quantize(Decimal("0.01"))
-        rows.append(
-            InventoryReportRow(
-                sku=product.sku,
-                name=product.name,
-                quantity=product.quantity,
-                purchase_price=product.purchase_price,
-                sale_price=product.sale_price,
-                stock_value=value,
+    return DebtReport(by_customer=by_customer, by_status=by_status, total_remaining=total_remaining)
+
+
+def expense_report(db: Session, *, company_id: int | None, store_id: int | None) -> ExpenseReport:
+    scope = _scope_filters(Expense, company_id, store_id)
+
+    by_type = [
+        ExpenseByType(expense_type=row.et.value, total=_dec(row.total), count=row.cnt)
+        for row in db.execute(
+            select(
+                Expense.expense_type.label("et"),
+                func.coalesce(func.sum(Expense.amount), 0).label("total"),
+                func.count(Expense.id).label("cnt"),
             )
-        )
-        total_value += value
+            .where(*scope)
+            .group_by(Expense.expense_type)
+        ).all()
+    ]
 
-    return InventoryReport(rows=rows, total_stock_value=total_value, count=len(rows))
+    by_date = [
+        ChartPoint(label=str(row.d), value=_dec(row.total))
+        for row in db.execute(
+            select(
+                Expense.date.label("d"),
+                func.coalesce(func.sum(Expense.amount), 0).label("total"),
+            )
+            .where(*scope)
+            .group_by(Expense.date)
+            .order_by(Expense.date.asc())
+        ).all()
+    ]
 
-
-def profit_report(db: Session, date_from: date_type | None, date_to: date_type | None) -> ProfitReport:
-    stmt = (
-        select(
-            func.coalesce(func.sum(StockOutItem.subtotal), 0),
-            func.coalesce(func.sum(StockOutItem.quantity * Product.purchase_price), 0),
-            func.count(func.distinct(StockOut.id)),
-        )
-        .select_from(StockOutItem)
-        .join(StockOut, StockOutItem.stock_out_id == StockOut.id)
-        .join(Product, StockOutItem.product_id == Product.id)
-    )
-    stmt = _apply_date_range(stmt, StockOut.date, date_from, date_to)
-
-    revenue_val, cost_val, count_val = db.execute(stmt).one()
-    revenue = Decimal(revenue_val or 0)
-    cost = Decimal(cost_val or 0)
-    return ProfitReport(
-        revenue=revenue,
-        cost_of_goods=cost,
-        gross_profit=(revenue - cost),
-        count=int(count_val or 0),
-    )
+    total = _dec(db.execute(select(func.coalesce(func.sum(Expense.amount), 0)).where(*scope)).scalar())
+    return ExpenseReport(by_type=by_type, by_date=by_date, total=total)
