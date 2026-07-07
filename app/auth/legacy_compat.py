@@ -233,3 +233,20 @@ def require_settings_manage(current_user: CurrentUser) -> User:
 
 
 RequireSettingsManage = Annotated[User, Depends(require_settings_manage)]
+
+
+def require_supplier_actor(current_user: CurrentUser) -> User:
+    """Allow recording / reading Suppliers: CEO or Seller or the legacy admin
+    (transitional). Company-wide for both — Suppliers has no store scope,
+    same shape as ``require_customer_actor`` (DATABASE_DESIGN.md §3.10/§6:
+    same "Partners" category as Customers). Remove the ``is_superuser``
+    branch when the legacy world retires.
+    """
+    if current_user.role in (UserRole.CEO, UserRole.SELLER):
+        return current_user
+    if current_user.is_superuser:  # TRANSITIONAL: legacy single-tenant admin
+        return current_user
+    raise PermissionDeniedError("Faqat CEO yoki sotuvchi uchun")
+
+
+RequireSupplierActor = Annotated[User, Depends(require_supplier_actor)]

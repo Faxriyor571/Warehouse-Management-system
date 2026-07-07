@@ -1,39 +1,52 @@
-"""Supplier CRUD endpoints."""
+"""Supplier endpoints. Company-scoped (DATABASE_DESIGN.md §3.10, "Partners"
+category, same pattern as Customers).
+
+Company-wide (no store scope): CEO and Seller share the same access tier
+(mirrors Customers pre-deactivate-split — no debt/lifecycle concept exists
+for Suppliers). The legacy single-tenant admin is admitted transitionally
+and operates in the NULL-company scope. Super Admin has no access.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Query, status
 
-from app.auth.dependencies import CurrentUser, DbSession
+from app.auth.dependencies import DbSession
+from app.auth.legacy_compat import RequireSupplierActor
 from app.crud.supplier import supplier as supplier_crud
 from app.models.enums import AuditAction
 from app.models.supplier import Supplier
-from app.permissions.dependencies import require_permission
+from app.models.user import User
 from app.schemas.common import Message, PaginatedResponse
 from app.schemas.supplier import SupplierCreate, SupplierOut, SupplierUpdate
 from app.services import audit_service
+from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
 
-@router.get(
-    "",
-    response_model=PaginatedResponse[SupplierOut],
-    dependencies=[Depends(require_permission("supplier.view"))],
-    summary="Yetkazib beruvchilar ro'yxati",
-)
+def _resolve_company(current_user: User) -> int | None:
+    return current_user.company_id  # None for the legacy single-tenant admin
+
+
+def _get_supplier_or_404(db: DbSession, current_user: User, supplier_id: int) -> Supplier:
+    obj = supplier_crud.get_for_company(db, supplier_id, _resolve_company(current_user))
+    if obj is None:
+        raise NotFoundError(f"Yetkazib beruvchi (id={supplier_id}) topilmadi")
+    return obj
+
+
+@router.get("", response_model=PaginatedResponse[SupplierOut], summary="Yetkazib beruvchilar ro'yxati")
 def list_suppliers(
     db: DbSession,
+    current_user: RequireSupplierActor,
     search: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
 ) -> PaginatedResponse[SupplierOut]:
     params = PageParams(page=page, page_size=page_size)
-    items, total = supplier_crud.list(
-        db,
-        page_params=params,
-        search=search,
-        search_fields=[Supplier.name, Supplier.phone, Supplier.responsible_person],
+    items, total = supplier_crud.list_for_company(
+        db, _resolve_company(current_user), page_params=params, search=search
     )
     return PaginatedResponse[SupplierOut](items=items, meta=make_meta(total, params))
 
@@ -42,11 +55,12 @@ def list_suppliers(
     "",
     response_model=SupplierOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_permission("supplier.manage"))],
     summary="Yetkazib beruvchi qo'shish",
 )
-def create_supplier(db: DbSession, current_user: CurrentUser, data: SupplierCreate) -> Supplier:
-    obj = supplier_crud.create(db, data.model_dump())
+def create_supplier(db: DbSession, current_user: RequireSupplierActor, data: SupplierCreate) -> Supplier:
+    payload = data.model_dump()
+    payload["company_id"] = _resolve_company(current_user)
+    obj = supplier_crud.create(db, payload)
     audit_service.log_action(
         db,
         action=AuditAction.CREATE,
@@ -58,26 +72,16 @@ def create_supplier(db: DbSession, current_user: CurrentUser, data: SupplierCrea
     return obj
 
 
-@router.get(
-    "/{supplier_id}",
-    response_model=SupplierOut,
-    dependencies=[Depends(require_permission("supplier.view"))],
-    summary="Yetkazib beruvchi ma'lumoti",
-)
-def get_supplier(db: DbSession, supplier_id: int) -> Supplier:
-    return supplier_crud.get_or_404(db, supplier_id)
+@router.get("/{supplier_id}", response_model=SupplierOut, summary="Yetkazib beruvchi ma'lumoti")
+def get_supplier(db: DbSession, current_user: RequireSupplierActor, supplier_id: int) -> Supplier:
+    return _get_supplier_or_404(db, current_user, supplier_id)
 
 
-@router.put(
-    "/{supplier_id}",
-    response_model=SupplierOut,
-    dependencies=[Depends(require_permission("supplier.manage"))],
-    summary="Yetkazib beruvchini yangilash",
-)
+@router.put("/{supplier_id}", response_model=SupplierOut, summary="Yetkazib beruvchini yangilash")
 def update_supplier(
-    db: DbSession, current_user: CurrentUser, supplier_id: int, data: SupplierUpdate
+    db: DbSession, current_user: RequireSupplierActor, supplier_id: int, data: SupplierUpdate
 ) -> Supplier:
-    obj = supplier_crud.get_or_404(db, supplier_id)
+    obj = _get_supplier_or_404(db, current_user, supplier_id)
     updated = supplier_crud.update(db, obj, data.model_dump(exclude_unset=True))
     audit_service.log_action(
         db,
@@ -90,14 +94,9 @@ def update_supplier(
     return updated
 
 
-@router.delete(
-    "/{supplier_id}",
-    response_model=Message,
-    dependencies=[Depends(require_permission("supplier.manage"))],
-    summary="Yetkazib beruvchini o'chirish",
-)
-def delete_supplier(db: DbSession, current_user: CurrentUser, supplier_id: int) -> Message:
-    obj = supplier_crud.get_or_404(db, supplier_id)
+@router.delete("/{supplier_id}", response_model=Message, summary="Yetkazib beruvchini o'chirish")
+def delete_supplier(db: DbSession, current_user: RequireSupplierActor, supplier_id: int) -> Message:
+    obj = _get_supplier_or_404(db, current_user, supplier_id)
     supplier_crud.remove(db, obj)
     audit_service.log_action(
         db,

@@ -3,7 +3,7 @@
 Creating a stock-in document atomically, within one transaction owned by this
 service (``apply_movement`` is called with ``commit=False``):
 
-- validates the supplier (existence only — Suppliers is not company-scoped yet),
+- validates the supplier (company-scoped — a foreign company's supplier_id is a 404),
 - validates each product within the caller's company,
 - creates the header and line items,
 - increases inventory:
@@ -65,7 +65,7 @@ def create_stock_in(
     ``company_id``/``store_id`` are resolved by the router from the caller
     (Seller → own store; CEO → validated body store; legacy admin → both None).
     """
-    if data.supplier_id is not None and supplier_crud.get(db, data.supplier_id) is None:
+    if data.supplier_id is not None and supplier_crud.get_for_company(db, data.supplier_id, company_id) is None:
         raise NotFoundError(f"Yetkazib beruvchi (id={data.supplier_id}) topilmadi")
 
     header = StockIn(

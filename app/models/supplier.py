@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -14,11 +14,19 @@ if TYPE_CHECKING:
 
 
 class Supplier(Base, TimestampMixin, SoftDeleteMixin):
-    """A company or person that supplies products to the warehouse."""
+    """A company or person that supplies products to the warehouse.
+
+    Company-wide (DATABASE_DESIGN.md §3.10/§6), like Customers: scoped by
+    ``company_id`` only, nullable for the legacy single-tenant flow. No
+    uniqueness constraint required beyond ``id``.
+    """
 
     __tablename__ = "suppliers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(200), index=True, nullable=False)
     phone: Mapped[str | None] = mapped_column(String(30), index=True, nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
