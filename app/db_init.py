@@ -128,8 +128,22 @@ def seed_all(db: Session) -> None:
 
 
 def init_db() -> None:
-    """Entry point called on startup: create tables and seed baseline data."""
-    create_tables()
+    """Entry point called on startup: ensure schema exists and seed baseline data.
+
+    Schema management differs by environment:
+
+    - **Production** (``app_env=production``): the schema is owned by Alembic.
+      Run ``alembic upgrade head`` as a deploy step *before* starting the app;
+      startup does NOT auto-create tables (``create_all`` cannot ALTER existing
+      tables, so it would silently miss migrations). Only idempotent seeding
+      runs here.
+    - **Development / local**: ``create_all`` is kept for convenience so a fresh
+      checkout is runnable without invoking Alembic.
+
+    Seeding is idempotent in both cases.
+    """
+    if not settings.is_production:
+        create_tables()
     with SessionLocal() as db:
         seed_all(db)
-    logger.info("Ma'lumotlar bazasi tayyor (jadvallar va boshlang'ich ma'lumotlar)")
+    logger.info("Ma'lumotlar bazasi tayyor (sxema va boshlang'ich ma'lumotlar)")
