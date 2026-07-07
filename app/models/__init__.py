@@ -15,6 +15,7 @@ from app.models.enums import (
     AuditAction,
     CompanyStatus,
     DebtStatus,
+    MovementType,
     PaymentMethodType,
     PaymentStatus,
     RoleName,
@@ -27,8 +28,10 @@ from app.models.refresh_token import RefreshToken
 from app.models.role import Permission, Role, role_permissions
 from app.models.setting import Setting
 from app.models.stock_in import StockIn, StockInItem
+from app.models.stock_movement import StockMovement
 from app.models.stock_out import StockOut, StockOutItem
 from app.models.store import Store
+from app.models.store_stock import StoreStock
 from app.models.supplier import Supplier
 from app.models.unit import Unit
 from app.models.user import User
@@ -51,9 +54,11 @@ __all__ = [
     "Setting",
     "StockIn",
     "StockInItem",
+    "StockMovement",
     "StockOut",
     "StockOutItem",
     "Store",
+    "StoreStock",
     "Supplier",
     "Unit",
     "User",
@@ -61,6 +66,7 @@ __all__ = [
     "AuditAction",
     "CompanyStatus",
     "DebtStatus",
+    "MovementType",
     "PaymentMethodType",
     "PaymentStatus",
     "RoleName",

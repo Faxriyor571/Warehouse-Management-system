@@ -78,3 +78,17 @@ class CompanyStatus(str, enum.Enum):
 
     ACTIVE = "active"
     SUSPENDED = "suspended"
+
+
+class MovementType(str, enum.Enum):
+    """Kinds of inventory movement recorded in ``stock_movements`` (§3.9/§11).
+
+    ``sales_return`` and ``adjustment`` are defined now so the ledger is ready
+    for the Sales-return and future stock-adjustment features; only
+    ``stock_in`` and ``sale`` are produced by the writers migrated so far.
+    """
+
+    STOCK_IN = "stock_in"
+    SALE = "sale"
+    SALES_RETURN = "sales_return"
+    ADJUSTMENT = "adjustment"

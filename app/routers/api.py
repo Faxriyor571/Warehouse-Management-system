@@ -12,6 +12,7 @@ from app.routers import (
     employees,
     dashboard,
     debts,
+    inventory,
     payment_methods,
     products,
     reminders,
@@ -39,6 +40,7 @@ api_router.include_router(companies.router)
 # Company operations (multi-tenant, CEO / Seller)
 api_router.include_router(stores.router)
 api_router.include_router(employees.router)
+api_router.include_router(inventory.router)
 
 # Catalogue
 api_router.include_router(categories.router)
