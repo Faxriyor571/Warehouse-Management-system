@@ -219,6 +219,7 @@ export default function EmployeesPage() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
+                            disabled={activateMutation.isPending}
                             onClick={() => activateMutation.mutate(employee.id)}
                             aria-label="Faollashtirish"
                           >
