@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/providers/auth-provider";
 import CategoriesPage from "@/pages/CategoriesPage";
+import CustomersPage from "@/pages/CustomersPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
@@ -51,6 +52,7 @@ export default function App() {
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/units" element={<UnitsPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

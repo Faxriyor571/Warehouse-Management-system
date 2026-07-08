@@ -1,4 +1,4 @@
-import { Boxes, LayoutDashboard, Ruler, Store, Tag, Truck, type LucideIcon } from "lucide-react";
+import { Boxes, LayoutDashboard, Ruler, Store, Tag, Truck, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   id: string;
@@ -35,6 +35,9 @@ export const navSections: NavSection[] = [
   {
     id: "partners",
     label: "HAMKORLAR",
-    items: [{ id: "suppliers", title: "Yetkazib beruvchilar", href: "/suppliers", icon: Truck }],
+    items: [
+      { id: "suppliers", title: "Yetkazib beruvchilar", href: "/suppliers", icon: Truck },
+      { id: "customers", title: "Mijozlar", href: "/customers", icon: Users },
+    ],
   },
 ];
