@@ -11,6 +11,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
 import StoresPage from "@/pages/StoresPage";
+import UnitsPage from "@/pages/UnitsPage";
 
 /**
  * Never retry 4xx client errors (permission/validation/not-found) — they
@@ -47,6 +48,7 @@ export default function App() {
                 <Route path="/stores" element={<StoresPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
+                <Route path="/units" element={<UnitsPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
