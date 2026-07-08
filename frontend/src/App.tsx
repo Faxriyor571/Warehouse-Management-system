@@ -11,6 +11,9 @@ import CustomersPage from "@/pages/CustomersPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
+import SalesDetailPage from "@/pages/SalesDetailPage";
+import SalesNewPage from "@/pages/SalesNewPage";
+import SalesPage from "@/pages/SalesPage";
 import StockInDetailPage from "@/pages/StockInDetailPage";
 import StockInNewPage from "@/pages/StockInNewPage";
 import StockInPage from "@/pages/StockInPage";
@@ -59,6 +62,9 @@ export default function App() {
                 <Route path="/stock-in" element={<StockInPage />} />
                 <Route path="/stock-in/new" element={<StockInNewPage />} />
                 <Route path="/stock-in/:id" element={<StockInDetailPage />} />
+                <Route path="/sales" element={<SalesPage />} />
+                <Route path="/sales/new" element={<SalesNewPage />} />
+                <Route path="/sales/:id" element={<SalesDetailPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
