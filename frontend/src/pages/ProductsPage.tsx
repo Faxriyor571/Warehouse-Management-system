@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -163,7 +164,7 @@ export default function ProductsPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
+      <TableCard className="mt-6">
         {isError ? (
           <ErrorState
             error={firstError}
@@ -210,7 +211,7 @@ export default function ProductsPage() {
                     </TableCell>
                     {isCeo ? (
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1.5">
                           <Button variant="ghost" size="icon-sm" onClick={() => setModalProduct(product)} aria-label="Tahrirlash">
                             <Pencil className="size-4" />
                           </Button>
@@ -226,7 +227,7 @@ export default function ProductsPage() {
             </Table>
           </div>
         )}
-      </div>
+      </TableCard>
 
       <Modal
         open={isEditing}

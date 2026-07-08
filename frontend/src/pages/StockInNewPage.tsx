@@ -121,7 +121,7 @@ export default function StockInNewPage() {
               const line = watchedItems[index];
               const subtotal = (Number(line?.quantity) || 0) * (Number(line?.price) || 0);
               return (
-                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-lg border p-4 transition-colors hover:border-border/80 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-colors hover:border-primary/30 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
                   <FormField htmlFor={`item-product-${index}`} label="Mahsulot" required>
                     <Select id={`item-product-${index}`} options={productOptions} placeholder="Mahsulotni tanlang…" {...form.register(`items.${index}.product_id`)} />
                   </FormField>
@@ -143,7 +143,7 @@ export default function StockInNewPage() {
             })}
           </div>
 
-          <div className="flex justify-end border-t pt-4">
+          <div className="flex justify-end border-t border-border/70 pt-4">
             <p className="text-sm">
               <span className="text-muted-foreground">Jami: </span>
               <span className="font-medium tabular-nums">{formatMoney(total)}</span>

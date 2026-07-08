@@ -12,9 +12,11 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -46,13 +48,19 @@ export default function DebtsPage() {
   const [customerId, setCustomerId] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [onlyOpen, setOnlyOpen] = React.useState(true);
+  const [page, setPage] = React.useState(1);
 
   const params: DebtListParams = {
     ...(storeId ? { store_id: Number(storeId) } : {}),
     ...(customerId ? { customer_id: Number(customerId) } : {}),
     ...(status ? { status: status as DebtStatus } : {}),
     ...(onlyOpen ? { only_open: true } : {}),
+    page,
   };
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [storeId, customerId, status, onlyOpen]);
 
   const debtsQuery = useQuery({ queryKey: ["debts", params], queryFn: () => debtService.list(params) });
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
@@ -98,7 +106,7 @@ export default function DebtsPage() {
               className="w-44"
             />
           ) : null}
-          <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 shadow-xs">
+          <div className="flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 shadow-xs">
             <Switch id="debts-only-open" checked={onlyOpen} onCheckedChange={setOnlyOpen} />
             <Label htmlFor="debts-only-open" className="cursor-pointer text-sm font-normal">
               Faqat qoldig'i borlar
@@ -106,7 +114,7 @@ export default function DebtsPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+        <TableCard>
           {debtsQuery.isError ? (
             <ErrorState error={debtsQuery.error} onRetry={() => void debtsQuery.refetch()} />
           ) : debtsQuery.isLoading ? (
@@ -145,7 +153,8 @@ export default function DebtsPage() {
               </Table>
             </div>
           )}
-        </div>
+          {debtsQuery.data ? <Pagination meta={debtsQuery.data.meta} onPageChange={setPage} /> : null}
+        </TableCard>
       </div>
     </ContentContainer>
   );

@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -140,7 +141,7 @@ export default function DebtDetailPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 rounded-lg border bg-card p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-card p-5 shadow-panel sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Boshlanish sanasi" value={formatDate(debt.start_date)} />
               <Field label="Muddati" value={debt.due_date ? formatDate(debt.due_date) : "—"} />
               <Field
@@ -163,7 +164,7 @@ export default function DebtDetailPage() {
 
             <div>
               <h2 className="mb-3 text-sm font-medium text-foreground">To'lovlar tarixi</h2>
-              <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+              <TableCard>
                 {debt.payments.length === 0 ? (
                   <EmptyState compact title="Hozircha to'lovlar yo'q" />
                 ) : (
@@ -190,7 +191,7 @@ export default function DebtDetailPage() {
                     </Table>
                   </div>
                 )}
-              </div>
+              </TableCard>
             </div>
           </div>
         )}

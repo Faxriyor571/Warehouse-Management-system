@@ -49,6 +49,7 @@ export interface SaleListParams {
   search?: string;
   date_from?: string;
   date_to?: string;
+  page?: number;
 }
 
 export interface SaleItemFormValues {

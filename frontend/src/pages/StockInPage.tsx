@@ -11,9 +11,11 @@ import type { StockInListParams } from "@/types/stock-in";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, SearchInput } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -29,13 +31,19 @@ export default function StockInPage() {
   const [storeId, setStoreId] = React.useState("");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
+  const [page, setPage] = React.useState(1);
 
   const params: StockInListParams = {
     ...(search ? { search } : {}),
     ...(storeId ? { store_id: Number(storeId) } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
+    page,
   };
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, storeId, dateFrom, dateTo]);
 
   const stockInQuery = useQuery({
     queryKey: ["stock-in", params],
@@ -66,7 +74,7 @@ export default function StockInPage() {
 
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Input
+          <SearchInput
             placeholder="Hujjat raqami bo'yicha qidirish…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -85,7 +93,7 @@ export default function StockInPage() {
           ) : null}
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+        <TableCard>
           {stockInQuery.isError ? (
             <ErrorState error={stockInQuery.error} onRetry={() => void stockInQuery.refetch()} />
           ) : stockInQuery.isLoading ? (
@@ -120,7 +128,8 @@ export default function StockInPage() {
               </Table>
             </div>
           )}
-        </div>
+          {stockInQuery.data ? <Pagination meta={stockInQuery.data.meta} onPageChange={setPage} /> : null}
+        </TableCard>
       </div>
     </ContentContainer>
   );

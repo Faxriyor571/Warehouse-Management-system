@@ -12,11 +12,12 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, SearchInput } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -107,14 +108,14 @@ function StoreStockView({ storeId }: { storeId?: number }) {
 
   return (
     <div className="space-y-4">
-      <Input
+      <SearchInput
         placeholder="Mahsulot nomi yoki SKU bo'yicha qidirish…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="w-72"
       />
 
-      <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+      <TableCard>
         {query.isError ? (
           <ErrorState error={query.error} onRetry={() => void query.refetch()} />
         ) : query.isLoading ? (
@@ -154,7 +155,7 @@ function StoreStockView({ storeId }: { storeId?: number }) {
             </Table>
           </div>
         )}
-      </div>
+      </TableCard>
 
       <Modal
         open={crossStoreProduct !== null}
@@ -233,7 +234,7 @@ function MovementsView({ storeId }: { storeId?: number }) {
         <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
       </div>
 
-      <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+      <TableCard>
         {query.isError ? (
           <ErrorState error={query.error} onRetry={() => void query.refetch()} />
         ) : query.isLoading ? (
@@ -278,7 +279,7 @@ function MovementsView({ storeId }: { storeId?: number }) {
             </Table>
           </div>
         )}
-      </div>
+      </TableCard>
     </div>
   );
 }

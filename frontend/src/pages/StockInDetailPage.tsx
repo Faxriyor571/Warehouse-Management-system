@@ -9,6 +9,7 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
 
@@ -50,7 +51,7 @@ export default function StockInDetailPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-card p-5 shadow-panel sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Sana" value={formatDateTime(doc.date)} />
               <Field label="Do'kon" value={store?.name ?? "—"} />
               <Field label="Yaratgan xodim" value={doc.created_by?.full_name ?? "—"} />
@@ -61,7 +62,7 @@ export default function StockInDetailPage() {
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+            <TableCard>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -84,10 +85,10 @@ export default function StockInDetailPage() {
                   </TableBody>
                 </Table>
               </div>
-            </div>
+            </TableCard>
 
             <div className="flex justify-end">
-              <div className="w-full max-w-xs space-y-1 rounded-lg border p-4">
+              <div className="w-full max-w-xs space-y-1 rounded-xl border border-border/70 bg-card p-5 shadow-panel">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Jami</span>
                   <span className="font-medium tabular-nums">{formatMoney(doc.total_amount)}</span>

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
 import { FormField } from "@/components/forms/form-field";
@@ -109,7 +110,7 @@ export default function SalesDetailPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 rounded-lg border bg-card p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-card p-5 shadow-panel sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Sana" value={formatDateTime(sale.date)} />
               <Field label="Do'kon" value={store?.name ?? "—"} />
               <Field label="Mijoz" value={sale.customer?.full_name ?? "—"} />
@@ -128,7 +129,7 @@ export default function SalesDetailPage() {
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+            <TableCard>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -153,10 +154,10 @@ export default function SalesDetailPage() {
                   </TableBody>
                 </Table>
               </div>
-            </div>
+            </TableCard>
 
             <div className="flex justify-end">
-              <div className="w-full max-w-xs space-y-1 rounded-lg border bg-card p-4 shadow-xs">
+              <div className="w-full max-w-xs space-y-1 rounded-xl border border-border/70 bg-card p-5 shadow-panel">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Oraliq summa</span>
                   <span className="tabular-nums">{formatMoney(sale.subtotal)}</span>
@@ -179,7 +180,7 @@ export default function SalesDetailPage() {
             {sale.payments.length > 0 ? (
               <div>
                 <h2 className="mb-3 text-sm font-medium text-foreground">To'lovlar</h2>
-                <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+                <TableCard>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -202,14 +203,14 @@ export default function SalesDetailPage() {
                       </TableBody>
                     </Table>
                   </div>
-                </div>
+                </TableCard>
               </div>
             ) : null}
 
             {(returnsQuery.data ?? []).length > 0 ? (
               <div>
                 <h2 className="mb-3 text-sm font-medium text-foreground">Qaytarishlar</h2>
-                <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+                <TableCard>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -232,7 +233,7 @@ export default function SalesDetailPage() {
                       </TableBody>
                     </Table>
                   </div>
-                </div>
+                </TableCard>
               </div>
             ) : null}
           </div>

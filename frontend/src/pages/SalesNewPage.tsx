@@ -188,7 +188,7 @@ export default function SalesNewPage() {
               const discount = Number(line?.discount) || 0;
               const subtotal = qty * price - discount;
               return (
-                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-lg border p-4 transition-colors hover:border-border/80 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
+                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-colors hover:border-primary/30 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
                   <FormField htmlFor={`sale-item-product-${index}`} label="Mahsulot" required>
                     <Select id={`sale-item-product-${index}`} options={productOptions} placeholder="Mahsulotni tanlang…" {...form.register(`items.${index}.product_id`)} />
                   </FormField>
@@ -220,7 +220,7 @@ export default function SalesNewPage() {
             })}
           </div>
 
-          <div className="flex justify-end border-t pt-4">
+          <div className="flex justify-end border-t border-border/70 pt-4">
             <p className="text-sm">
               <span className="text-muted-foreground">Jami: </span>
               <span className="font-medium tabular-nums">{formatMoney(total)}</span>
@@ -244,7 +244,7 @@ export default function SalesNewPage() {
           ) : (
             <div className="space-y-3">
               {paymentsArray.fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-lg border p-4 transition-colors hover:border-border/80 sm:grid-cols-[1fr_1fr_2fr_auto]">
+                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-colors hover:border-primary/30 sm:grid-cols-[1fr_1fr_2fr_auto]">
                   <FormField htmlFor={`sale-payment-method-${index}`} label="To'lov turi" required>
                     <Select id={`sale-payment-method-${index}`} options={paymentMethodOptions} placeholder="Tanlang…" {...form.register(`payments.${index}.payment_method_id`)} />
                   </FormField>
@@ -262,7 +262,7 @@ export default function SalesNewPage() {
             </div>
           )}
 
-          <div className="flex justify-end gap-6 border-t pt-4 text-sm">
+          <div className="flex justify-end gap-6 border-t border-border/70 pt-4 text-sm">
             <p>
               <span className="text-muted-foreground">To'langan: </span>
               <span className="font-medium tabular-nums">{formatMoney(paidTotal)}</span>

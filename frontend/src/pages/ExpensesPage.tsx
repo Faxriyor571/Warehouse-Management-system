@@ -18,8 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -60,13 +62,19 @@ export default function ExpensesPage() {
   const [expenseType, setExpenseType] = React.useState("");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
+  const [page, setPage] = React.useState(1);
 
   const params: ExpenseListParams = {
     ...(storeId ? { store_id: Number(storeId) } : {}),
     ...(expenseType ? { expense_type: expenseType as ExpenseType } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
+    page,
   };
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [storeId, expenseType, dateFrom, dateTo]);
 
   const expensesQuery = useQuery({ queryKey: ["expenses", params], queryFn: () => expenseService.list(params) });
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
@@ -139,7 +147,7 @@ export default function ExpensesPage() {
           ) : null}
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+        <TableCard>
           {expensesQuery.isError ? (
             <ErrorState error={expensesQuery.error} onRetry={() => void expensesQuery.refetch()} />
           ) : expensesQuery.isLoading ? (
@@ -176,15 +184,16 @@ export default function ExpensesPage() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="flex justify-end border-t px-4 py-3">
+              <div className="flex justify-end border-t border-border/70 px-5 py-3">
                 <p className="text-sm">
-                  <span className="text-muted-foreground">Jami: </span>
+                  <span className="text-muted-foreground">Joriy sahifa jami: </span>
                   <span className="font-medium tabular-nums">{formatMoney(total)}</span>
                 </p>
               </div>
             </div>
           )}
-        </div>
+          {expensesQuery.data ? <Pagination meta={expensesQuery.data.meta} onPageChange={setPage} /> : null}
+        </TableCard>
       </div>
 
       <Modal

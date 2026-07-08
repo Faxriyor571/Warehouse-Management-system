@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -109,7 +110,7 @@ export default function StoresPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
+      <TableCard className="mt-6">
         {storesQuery.isError ? (
           <ErrorState error={storesQuery.error} onRetry={() => void storesQuery.refetch()} />
         ) : storesQuery.isLoading ? (
@@ -149,7 +150,7 @@ export default function StoresPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1.5">
                           <Button variant="ghost" size="icon-sm" onClick={() => setModalStore(store)} aria-label="Tahrirlash">
                             <Pencil className="size-4" />
                           </Button>
@@ -171,7 +172,7 @@ export default function StoresPage() {
             </TableBody>
           </Table>
         )}
-      </div>
+      </TableCard>
 
       <Modal
         open={isEditing}

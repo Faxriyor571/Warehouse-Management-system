@@ -30,13 +30,24 @@ function SkeletonCard({ className }: { className?: string }) {
   );
 }
 
-/** TableSkeleton — the standard loading placeholder for a list page's table. */
-function TableSkeleton({ rows = 4, className }: { rows?: number; className?: string }) {
+/** TableSkeleton — the standard loading placeholder for a list page's table, shaped like an actual table. */
+function TableSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {
   return (
-    <div className={cn("space-y-3 p-6", className)}>
-      {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-10 w-full" />
-      ))}
+    <div className={cn("p-5", className)} aria-hidden>
+      <div className="flex items-center gap-6 border-b border-border/70 pb-3">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="ml-auto h-3 w-16" />
+      </div>
+      <div className="divide-y divide-border/70">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-6 py-3.5">
+            <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="ml-auto h-4 w-14" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

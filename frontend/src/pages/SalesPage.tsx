@@ -13,9 +13,11 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, SearchInput } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -51,6 +53,7 @@ export default function SalesPage() {
   const [paymentStatus, setPaymentStatus] = React.useState("");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
+  const [page, setPage] = React.useState(1);
 
   const params: SaleListParams = {
     ...(search ? { search } : {}),
@@ -59,7 +62,12 @@ export default function SalesPage() {
     ...(paymentStatus ? { payment_status: paymentStatus as PaymentStatus } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
+    page,
   };
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, storeId, customerId, paymentStatus, dateFrom, dateTo]);
 
   const salesQuery = useQuery({ queryKey: ["sales", params], queryFn: () => saleService.list(params) });
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
@@ -91,7 +99,7 @@ export default function SalesPage() {
 
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Input
+          <SearchInput
             placeholder="Hujjat raqami bo'yicha qidirish…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -124,7 +132,7 @@ export default function SalesPage() {
           ) : null}
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+        <TableCard>
           {salesQuery.isError ? (
             <ErrorState error={salesQuery.error} onRetry={() => void salesQuery.refetch()} />
           ) : salesQuery.isLoading ? (
@@ -165,7 +173,8 @@ export default function SalesPage() {
               </Table>
             </div>
           )}
-        </div>
+          {salesQuery.data ? <Pagination meta={salesQuery.data.meta} onPageChange={setPage} /> : null}
+        </TableCard>
       </div>
     </ContentContainer>
   );

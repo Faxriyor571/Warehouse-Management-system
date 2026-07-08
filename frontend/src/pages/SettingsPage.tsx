@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -72,7 +73,7 @@ export default function SettingsPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
+      <TableCard className="mt-6">
         {settingsQuery.isError ? (
           <ErrorState error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} />
         ) : settingsQuery.isLoading ? (
@@ -107,7 +108,7 @@ export default function SettingsPage() {
             </TableBody>
           </Table>
         )}
-      </div>
+      </TableCard>
 
       <Modal
         open={modalEntry !== null}

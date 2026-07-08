@@ -40,6 +40,7 @@ export interface DebtListParams {
   only_open?: boolean;
   due_before?: string;
   due_after?: string;
+  page?: number;
 }
 
 export interface DebtPaymentFormValues {

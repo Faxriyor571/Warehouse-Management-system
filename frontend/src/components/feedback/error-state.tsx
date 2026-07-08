@@ -47,14 +47,14 @@ export function ErrorState({
     >
       <div
         className={cn(
-          "flex items-center justify-center rounded-full bg-destructive/10 text-destructive",
-          compact ? "size-10" : "size-14"
+          "flex items-center justify-center rounded-2xl bg-destructive/10 text-destructive ring-1 ring-destructive/15",
+          compact ? "size-11" : "size-14"
         )}
       >
         {isForbidden ? (
-          <ShieldAlert className={compact ? "size-5" : "size-7"} aria-hidden />
+          <ShieldAlert className={compact ? "size-5" : "size-6"} strokeWidth={1.75} aria-hidden />
         ) : (
-          <AlertOctagon className={compact ? "size-5" : "size-7"} aria-hidden />
+          <AlertOctagon className={compact ? "size-5" : "size-6"} strokeWidth={1.75} aria-hidden />
         )}
       </div>
       <div className="space-y-1">
@@ -67,7 +67,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-1 inline-flex items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          className="mt-1.5 inline-flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
         >
           <RotateCw className="size-4" />
           {retryLabel}
