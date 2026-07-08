@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/providers/auth-provider";
+import CategoriesPage from "@/pages/CategoriesPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
@@ -45,6 +46,7 @@ export default function App() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/stores" element={<StoresPage />} />
                 <Route path="/products" element={<ProductsPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
