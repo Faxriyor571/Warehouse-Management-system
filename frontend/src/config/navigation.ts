@@ -11,8 +11,10 @@ import {
   Store,
   Tag,
   Truck,
+  UserCog,
   Users,
   Wallet,
+  Warehouse,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,7 +43,12 @@ export const navSections: NavSection[] = [
   {
     id: "company",
     label: "KOMPANIYA",
-    items: [{ id: "stores", title: "Do'konlar", href: "/stores", icon: Store }],
+    items: [
+      { id: "stores", title: "Do'konlar", href: "/stores", icon: Store },
+      // CEO only (strict — RequireCEO has no legacy-admin branch, unlike
+      // most other modules). A Seller has no backend access either.
+      { id: "employees", title: "Sotuvchilar", href: "/employees", icon: UserCog, roles: ["ceo"] },
+    ],
   },
   {
     id: "catalogue",
@@ -68,6 +75,9 @@ export const navSections: NavSection[] = [
       { id: "sales", title: "Savdo", href: "/sales", icon: ShoppingCart },
       { id: "debts", title: "Qarzlar", href: "/debts", icon: Wallet },
       { id: "expenses", title: "Xarajatlar", href: "/expenses", icon: Receipt },
+      // CEO or Seller only (strict — RequireCEOOrSeller has no legacy-admin
+      // branch, unlike Stock In/Sales/Debts/Expenses).
+      { id: "inventory", title: "Ombor", href: "/inventory", icon: Warehouse, roles: ["ceo", "seller"] },
     ],
   },
   {

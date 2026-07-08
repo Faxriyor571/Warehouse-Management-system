@@ -11,7 +11,9 @@ import CustomersPage from "@/pages/CustomersPage";
 import DashboardPage from "@/pages/DashboardPage";
 import DebtDetailPage from "@/pages/DebtDetailPage";
 import DebtsPage from "@/pages/DebtsPage";
+import EmployeesPage from "@/pages/EmployeesPage";
 import ExpensesPage from "@/pages/ExpensesPage";
+import InventoryPage from "@/pages/InventoryPage";
 import LoginPage from "@/pages/LoginPage";
 import PaymentMethodsPage from "@/pages/PaymentMethodsPage";
 import ProductsPage from "@/pages/ProductsPage";
@@ -60,6 +62,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/stores" element={<StoresPage />} />
+                <Route path="/employees" element={<EmployeesPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/units" element={<UnitsPage />} />
@@ -74,6 +77,7 @@ export default function App() {
                 <Route path="/debts" element={<DebtsPage />} />
                 <Route path="/debts/:id" element={<DebtDetailPage />} />
                 <Route path="/expenses" element={<ExpensesPage />} />
+                <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/payment-methods" element={<PaymentMethodsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

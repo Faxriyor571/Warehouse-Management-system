@@ -10,7 +10,6 @@ import {
   YAxis,
 } from "recharts";
 
-import { cn } from "@/lib/utils";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { reportService } from "@/services/report";
@@ -20,6 +19,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -75,21 +75,7 @@ export default function ReportsPage() {
       <PageHeader title="Hisobotlar" description="Savdo, ombor, qarz va xarajatlar bo'yicha umumiy ko'rinish." />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border bg-muted/40 p-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                tab === t.id ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs value={tab} onChange={setTab} options={tabs} />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {tab === "sales" ? (
