@@ -1,0 +1,109 @@
+import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Printer } from "lucide-react";
+
+import { formatDateTime, formatMoney, formatNumber } from "@/lib/formatters";
+import { stockInService } from "@/services/stock-in";
+import { storeService } from "@/services/store";
+import { ContentContainer } from "@/components/layout/content-container";
+import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/feedback/error-state";
+
+export default function StockInDetailPage() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const stockInId = Number(id);
+
+  const stockInQuery = useQuery({ queryKey: ["stock-in", stockInId], queryFn: () => stockInService.get(stockInId) });
+  const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list });
+
+  const doc = stockInQuery.data;
+  const store = (storesQuery.data ?? []).find((s) => s.id === doc?.store_id);
+
+  return (
+    <ContentContainer>
+      <PageHeader
+        title={doc ? doc.reference : "Kirim"}
+        actions={
+          <div className="flex gap-2 print:hidden">
+            <Button variant="outline" onClick={() => navigate("/stock-in")}>
+              Ortga
+            </Button>
+            <Button variant="outline" disabled={!doc} onClick={() => window.print()}>
+              <Printer />
+              Chop etish
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="mt-6">
+        {stockInQuery.isError ? (
+          <ErrorState onRetry={() => void stockInQuery.refetch()} />
+        ) : stockInQuery.isLoading || !doc ? (
+          <div className="space-y-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Sana" value={formatDateTime(doc.date)} />
+              <Field label="Do'kon" value={store?.name ?? "—"} />
+              <Field label="Yetkazib beruvchi" value={doc.supplier?.name ?? "—"} />
+              <Field label="Yaratgan xodim" value={doc.created_by?.full_name ?? "—"} />
+              {doc.note ? (
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <Field label="Izoh" value={doc.note} />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Mahsulot</th>
+                    <th className="px-4 py-2 text-right font-medium">Miqdor</th>
+                    <th className="px-4 py-2 text-right font-medium">Narx</th>
+                    <th className="px-4 py-2 text-right font-medium">Oraliq summa</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {doc.items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-2.5">{item.product ? `${item.product.name} (${item.product.sku})` : `Mahsulot #${item.product_id}`}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(item.quantity)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(item.price)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(item.subtotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="w-full max-w-xs space-y-1 rounded-lg border p-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Jami</span>
+                  <span className="font-medium tabular-nums">{formatMoney(doc.total_amount)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </ContentContainer>
+  );
+}
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-sm text-foreground">{value}</p>
+    </div>
+  );
+}

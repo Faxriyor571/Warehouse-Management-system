@@ -11,6 +11,9 @@ import CustomersPage from "@/pages/CustomersPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
+import StockInDetailPage from "@/pages/StockInDetailPage";
+import StockInNewPage from "@/pages/StockInNewPage";
+import StockInPage from "@/pages/StockInPage";
 import StoresPage from "@/pages/StoresPage";
 import SuppliersPage from "@/pages/SuppliersPage";
 import UnitsPage from "@/pages/UnitsPage";
@@ -53,6 +56,9 @@ export default function App() {
                 <Route path="/units" element={<UnitsPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/stock-in" element={<StockInPage />} />
+                <Route path="/stock-in/new" element={<StockInNewPage />} />
+                <Route path="/stock-in/:id" element={<StockInDetailPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
