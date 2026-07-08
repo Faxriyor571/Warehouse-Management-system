@@ -11,6 +11,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
 import StoresPage from "@/pages/StoresPage";
+import SuppliersPage from "@/pages/SuppliersPage";
 import UnitsPage from "@/pages/UnitsPage";
 
 /**
@@ -49,6 +50,7 @@ export default function App() {
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/units" element={<UnitsPage />} />
+                <Route path="/suppliers" element={<SuppliersPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
