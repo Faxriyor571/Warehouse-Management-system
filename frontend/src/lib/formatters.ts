@@ -54,3 +54,11 @@ export function formatDateTime(value: string | Date | null | undefined): string 
     minute: "2-digit",
   }).format(date);
 }
+
+/** Up-to-two-letter initials from a full name, for avatar fallbacks. */
+export function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
+  return `${parts[0]?.[0] ?? ""}${parts[parts.length - 1]?.[0] ?? ""}`.toUpperCase();
+}

@@ -16,11 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
+import { FormField } from "@/components/forms/FormField";
 
 const storeFormSchema = z.object({
   name: z.string().min(2, "Nomi kamida 2 belgidan iborat bo'lishi kerak"),
@@ -108,49 +109,46 @@ export default function StoresPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border">
+      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {storesQuery.isError ? (
           <ErrorState onRetry={() => void storesQuery.refetch()} />
         ) : storesQuery.isLoading ? (
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <TableSkeleton />
         ) : stores.length === 0 ? (
           <EmptyState
             title="Hozircha do'konlar yo'q"
             description={isCeo ? "Boshlash uchun birinchi do'koningizni yarating." : "Do'konlar topilmadi."}
+            action={isCeo ? <Button size="sm" onClick={() => setModalStore("new")}>Yangi do'kon</Button> : undefined}
           />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-6 py-2 text-left font-medium">Nomi</th>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Nomi</TableHead>
                 {isCeo ? (
                   <>
-                    <th className="px-6 py-2 text-left font-medium">Manzil</th>
-                    <th className="px-6 py-2 text-left font-medium">Telefon</th>
-                    <th className="px-6 py-2 text-left font-medium">Holati</th>
-                    <th className="px-6 py-2 text-right font-medium" />
+                    <TableHead>Manzil</TableHead>
+                    <TableHead>Telefon</TableHead>
+                    <TableHead>Holati</TableHead>
+                    <TableHead className="text-right" />
                   </>
                 ) : null}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {stores.map((store) => (
-                <tr key={store.id}>
-                  <td className="px-6 py-2.5 font-medium">{store.name}</td>
+                <TableRow key={store.id}>
+                  <TableCell className="font-medium">{store.name}</TableCell>
                   {isCeo ? (
                     <>
-                      <td className="px-6 py-2.5 text-muted-foreground">{store.address ?? "—"}</td>
-                      <td className="px-6 py-2.5 text-muted-foreground">{store.phone ?? "—"}</td>
-                      <td className="px-6 py-2.5">
+                      <TableCell className="text-muted-foreground">{store.address ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{store.phone ?? "—"}</TableCell>
+                      <TableCell>
                         <Badge variant={store.is_active ? "success" : "secondary"} dot>
                           {store.is_active ? "Faol" : "Nofaol"}
                         </Badge>
-                      </td>
-                      <td className="px-6 py-2.5">
+                      </TableCell>
+                      <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon-sm" onClick={() => setModalStore(store)} aria-label="Tahrirlash">
                             <Pencil className="size-4" />
@@ -165,13 +163,13 @@ export default function StoresPage() {
                             <Power className="size-4" />
                           </Button>
                         </div>
-                      </td>
+                      </TableCell>
                     </>
                   ) : null}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -191,23 +189,15 @@ export default function StoresPage() {
         }
       >
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-2">
-            <Label htmlFor="store-name" required>
-              Nomi
-            </Label>
+          <FormField htmlFor="store-name" label="Nomi" required error={form.formState.errors.name?.message}>
             <Input id="store-name" invalid={!!form.formState.errors.name} {...form.register("name")} />
-            {form.formState.errors.name ? (
-              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="store-address">Manzil</Label>
+          </FormField>
+          <FormField htmlFor="store-address" label="Manzil">
             <Input id="store-address" {...form.register("address")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="store-phone">Telefon</Label>
+          </FormField>
+          <FormField htmlFor="store-phone" label="Telefon">
             <Input id="store-phone" {...form.register("phone")} />
-          </div>
+          </FormField>
         </form>
       </Modal>
 

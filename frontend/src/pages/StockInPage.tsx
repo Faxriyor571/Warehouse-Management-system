@@ -14,7 +14,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
 
@@ -99,39 +100,42 @@ export default function StockInPage() {
           ) : null}
         </div>
 
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
           {stockInQuery.isError ? (
             <ErrorState onRetry={() => void stockInQuery.refetch()} />
           ) : stockInQuery.isLoading ? (
-            <div className="space-y-3 p-6">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
+            <TableSkeleton />
           ) : items.length === 0 ? (
-            <EmptyState title="Hozircha kirim hujjatlari yo'q" description="Boshlash uchun birinchi kirim hujjatingizni yarating." />
+            <EmptyState
+              title="Hozircha kirim hujjatlari yo'q"
+              description="Boshlash uchun birinchi kirim hujjatingizni yarating."
+              action={<Button size="sm" onClick={() => navigate("/stock-in/new")}>Yangi kirim</Button>}
+            />
           ) : (
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-6 py-2 text-left font-medium">Hujjat raqami</th>
-                  <th className="px-6 py-2 text-left font-medium">Sana</th>
-                  <th className="px-6 py-2 text-left font-medium">Yetkazib beruvchi</th>
-                  <th className="px-6 py-2 text-right font-medium">Qatorlar</th>
-                  <th className="px-6 py-2 text-right font-medium">Jami</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map((doc) => (
-                  <tr key={doc.id} className="cursor-pointer hover:bg-accent/50" onClick={() => navigate(`/stock-in/${doc.id}`)}>
-                    <td className="px-6 py-2.5 font-medium">{doc.reference}</td>
-                    <td className="px-6 py-2.5 text-muted-foreground">{formatDate(doc.date)}</td>
-                    <td className="px-6 py-2.5 text-muted-foreground">{doc.supplier?.name ?? "—"}</td>
-                    <td className="px-6 py-2.5 text-right tabular-nums">{doc.items.length}</td>
-                    <td className="px-6 py-2.5 text-right tabular-nums">{formatMoney(doc.total_amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Hujjat raqami</TableHead>
+                    <TableHead>Sana</TableHead>
+                    <TableHead>Yetkazib beruvchi</TableHead>
+                    <TableHead className="text-right">Qatorlar</TableHead>
+                    <TableHead className="text-right">Jami</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((doc) => (
+                    <TableRow key={doc.id} className="cursor-pointer" onClick={() => navigate(`/stock-in/${doc.id}`)}>
+                      <TableCell className="font-medium">{doc.reference}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatDate(doc.date)}</TableCell>
+                      <TableCell className="text-muted-foreground">{doc.supplier?.name ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{doc.items.length}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatMoney(doc.total_amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </div>
       </div>

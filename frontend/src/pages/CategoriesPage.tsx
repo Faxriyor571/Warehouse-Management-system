@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -15,12 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
+import { FormField } from "@/components/forms/FormField";
+import { SwitchField } from "@/components/forms/SwitchField";
 
 const categoryFormSchema = z.object({
   name: z.string().min(1, "Nomi to'ldirilishi shart"),
@@ -104,38 +105,38 @@ export default function CategoriesPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border">
+      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {categoriesQuery.isError ? (
           <ErrorState onRetry={() => void categoriesQuery.refetch()} />
         ) : categoriesQuery.isLoading ? (
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <TableSkeleton />
         ) : categories.length === 0 ? (
-          <EmptyState title="Hozircha kategoriyalar yo'q" description="Boshlash uchun birinchi kategoriyangizni yarating." />
+          <EmptyState
+            title="Hozircha kategoriyalar yo'q"
+            description="Boshlash uchun birinchi kategoriyangizni yarating."
+            action={<Button size="sm" onClick={() => setModalCategory("new")}>Yangi kategoriya</Button>}
+          />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-6 py-2 text-left font-medium">Nomi</th>
-                <th className="px-6 py-2 text-left font-medium">Tavsif</th>
-                <th className="px-6 py-2 text-left font-medium">Holati</th>
-                <th className="px-6 py-2 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Nomi</TableHead>
+                <TableHead>Tavsif</TableHead>
+                <TableHead>Holati</TableHead>
+                <TableHead className="text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {categories.map((category) => (
-                <tr key={category.id}>
-                  <td className="px-6 py-2.5 font-medium">{category.name}</td>
-                  <td className="px-6 py-2.5 text-muted-foreground">{category.description ?? "—"}</td>
-                  <td className="px-6 py-2.5">
+                <TableRow key={category.id}>
+                  <TableCell className="font-medium">{category.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{category.description ?? "—"}</TableCell>
+                  <TableCell>
                     <Badge variant={category.is_active ? "success" : "secondary"} dot>
                       {category.is_active ? "Faol" : "Nofaol"}
                     </Badge>
-                  </td>
-                  <td className="px-6 py-2.5">
+                  </TableCell>
+                  <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon-sm" onClick={() => setModalCategory(category)} aria-label="Tahrirlash">
                         <Pencil className="size-4" />
@@ -144,11 +145,11 @@ export default function CategoriesPage() {
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -168,30 +169,19 @@ export default function CategoriesPage() {
         }
       >
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-2">
-            <Label htmlFor="category-name" required>
-              Nomi
-            </Label>
+          <FormField htmlFor="category-name" label="Nomi" required error={form.formState.errors.name?.message}>
             <Input id="category-name" invalid={!!form.formState.errors.name} {...form.register("name")} />
-            {form.formState.errors.name ? <p className="text-sm text-destructive">{form.formState.errors.name.message}</p> : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="category-description">Tavsif</Label>
+          </FormField>
+          <FormField htmlFor="category-description" label="Tavsif">
             <Input id="category-description" {...form.register("description")} />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="category-active">Faol</Label>
-              <p className="text-sm text-muted-foreground">Nofaol kategoriyalar yangi mahsulotlarda ko'rinmaydi.</p>
-            </div>
-            <Controller
-              control={form.control}
-              name="is_active"
-              render={({ field }) => (
-                <Switch id="category-active" checked={field.value} onCheckedChange={field.onChange} />
-              )}
-            />
-          </div>
+          </FormField>
+          <SwitchField
+            control={form.control}
+            name="is_active"
+            htmlFor="category-active"
+            label="Faol"
+            description="Nofaol kategoriyalar yangi mahsulotlarda ko'rinmaydi."
+          />
         </form>
       </Modal>
 

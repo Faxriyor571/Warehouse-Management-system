@@ -7,15 +7,16 @@ export interface EmptyStateProps {
   icon?: LucideIcon;
   title: string;
   description?: React.ReactNode;
+  action?: React.ReactNode;
   className?: string;
   compact?: boolean;
 }
 
-export function EmptyState({ icon: Icon = Inbox, title, description, className, compact }: EmptyStateProps) {
+export function EmptyState({ icon: Icon = Inbox, title, description, action, className, compact }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center text-center",
+        "flex animate-in fade-in flex-col items-center justify-center text-center duration-300",
         compact ? "gap-2 p-6" : "gap-3 p-12",
         className
       )}
@@ -34,6 +35,7 @@ export function EmptyState({ icon: Icon = Inbox, title, description, className, 
           <p className="mx-auto max-w-sm text-sm text-muted-foreground">{description}</p>
         ) : null}
       </div>
+      {action ? <div className="mt-1">{action}</div> : null}
     </div>
   );
 }

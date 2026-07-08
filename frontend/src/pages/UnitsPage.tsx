@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -16,12 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
+import { FormField } from "@/components/forms/FormField";
+import { SwitchField } from "@/components/forms/SwitchField";
 
 const unitFormSchema = z.object({
   name: z.string().min(1, "Nomi to'ldirilishi shart"),
@@ -114,42 +115,42 @@ export default function UnitsPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border">
+      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {unitsQuery.isError ? (
           <ErrorState onRetry={() => void unitsQuery.refetch()} />
         ) : unitsQuery.isLoading ? (
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <TableSkeleton />
         ) : units.length === 0 ? (
-          <EmptyState title="Hozircha birliklar yo'q" description="Boshlash uchun birinchi birligingizni yarating." />
+          <EmptyState
+            title="Hozircha birliklar yo'q"
+            description="Boshlash uchun birinchi birligingizni yarating."
+            action={<Button size="sm" onClick={() => setModalUnit("new")}>Yangi birlik</Button>}
+          />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-6 py-2 text-left font-medium">Nomi</th>
-                <th className="px-6 py-2 text-left font-medium">Qisqa nomi</th>
-                <th className="px-6 py-2 text-right font-medium">Konversiya koeffitsienti</th>
-                <th className="px-6 py-2 text-left font-medium">Holati</th>
-                <th className="px-6 py-2 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Nomi</TableHead>
+                <TableHead>Qisqa nomi</TableHead>
+                <TableHead className="text-right">Konversiya koeffitsienti</TableHead>
+                <TableHead>Holati</TableHead>
+                <TableHead className="text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {units.map((unit) => (
-                <tr key={unit.id}>
-                  <td className="px-6 py-2.5 font-medium">{unit.name}</td>
-                  <td className="px-6 py-2.5 text-muted-foreground">{unit.short_name}</td>
-                  <td className="px-6 py-2.5 text-right tabular-nums">
+                <TableRow key={unit.id}>
+                  <TableCell className="font-medium">{unit.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{unit.short_name}</TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {unit.conversion_factor == null ? "—" : formatNumber(unit.conversion_factor, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-6 py-2.5">
+                  </TableCell>
+                  <TableCell>
                     <Badge variant={unit.is_active ? "success" : "secondary"} dot>
                       {unit.is_active ? "Faol" : "Nofaol"}
                     </Badge>
-                  </td>
-                  <td className="px-6 py-2.5">
+                  </TableCell>
+                  <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon-sm" onClick={() => setModalUnit(unit)} aria-label="Tahrirlash">
                         <Pencil className="size-4" />
@@ -158,11 +159,11 @@ export default function UnitsPage() {
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -182,37 +183,22 @@ export default function UnitsPage() {
         }
       >
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-2">
-            <Label htmlFor="unit-name" required>
-              Nomi
-            </Label>
+          <FormField htmlFor="unit-name" label="Nomi" required error={form.formState.errors.name?.message}>
             <Input id="unit-name" invalid={!!form.formState.errors.name} {...form.register("name")} />
-            {form.formState.errors.name ? <p className="text-sm text-destructive">{form.formState.errors.name.message}</p> : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="unit-short-name" required>
-              Qisqa nomi
-            </Label>
+          </FormField>
+          <FormField htmlFor="unit-short-name" label="Qisqa nomi" required error={form.formState.errors.short_name?.message}>
             <Input id="unit-short-name" invalid={!!form.formState.errors.short_name} {...form.register("short_name")} />
-            {form.formState.errors.short_name ? (
-              <p className="text-sm text-destructive">{form.formState.errors.short_name.message}</p>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="unit-conversion">Konversiya koeffitsienti</Label>
+          </FormField>
+          <FormField htmlFor="unit-conversion" label="Konversiya koeffitsienti">
             <Input id="unit-conversion" type="number" step="0.01" {...form.register("conversion_factor")} />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="unit-active">Faol</Label>
-              <p className="text-sm text-muted-foreground">Nofaol birliklar yangi mahsulotlarda ko'rinmaydi.</p>
-            </div>
-            <Controller
-              control={form.control}
-              name="is_active"
-              render={({ field }) => <Switch id="unit-active" checked={field.value} onCheckedChange={field.onChange} />}
-            />
-          </div>
+          </FormField>
+          <SwitchField
+            control={form.control}
+            name="is_active"
+            htmlFor="unit-active"
+            label="Faol"
+            description="Nofaol birliklar yangi mahsulotlarda ko'rinmaydi."
+          />
         </form>
       </Modal>
 

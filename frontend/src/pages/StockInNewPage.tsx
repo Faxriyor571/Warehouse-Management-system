@@ -18,8 +18,8 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { FormField } from "@/components/forms/FormField";
 
 const lineItemSchema = z.object({
   product_id: z.string().min(1, "Mahsulotni tanlash shart"),
@@ -97,28 +97,21 @@ export default function StockInNewPage() {
       <form className="mt-6 space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {isCeo ? (
-            <div className="space-y-2">
-              <Label htmlFor="stock-in-store" required>
-                Do'kon
-              </Label>
+            <FormField htmlFor="stock-in-store" label="Do'kon" required error={form.formState.errors.store_id?.message}>
               <Select id="stock-in-store" options={storeOptions} placeholder="Do'konni tanlang…" invalid={!!form.formState.errors.store_id} {...form.register("store_id")} />
-              {form.formState.errors.store_id ? <p className="text-sm text-destructive">{form.formState.errors.store_id.message}</p> : null}
-            </div>
+            </FormField>
           ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="stock-in-supplier">Yetkazib beruvchi</Label>
+          <FormField htmlFor="stock-in-supplier" label="Yetkazib beruvchi">
             <Select id="stock-in-supplier" options={supplierOptions} placeholder="Yetkazib beruvchini tanlang…" {...form.register("supplier_id")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="stock-in-date">Sana</Label>
+          </FormField>
+          <FormField htmlFor="stock-in-date" label="Sana">
             <Input id="stock-in-date" type="datetime-local" {...form.register("date")} />
-          </div>
+          </FormField>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="stock-in-note">Izoh</Label>
+        <FormField htmlFor="stock-in-note" label="Izoh">
           <Input id="stock-in-note" {...form.register("note")} />
-        </div>
+        </FormField>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -138,25 +131,16 @@ export default function StockInNewPage() {
               const line = watchedItems[index];
               const subtotal = (Number(line?.quantity) || 0) * (Number(line?.price) || 0);
               return (
-                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-lg border p-4 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-                  <div className="space-y-2">
-                    <Label htmlFor={`item-product-${index}`} required>
-                      Mahsulot
-                    </Label>
+                <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-lg border p-4 transition-colors hover:border-border/80 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                  <FormField htmlFor={`item-product-${index}`} label="Mahsulot" required>
                     <Select id={`item-product-${index}`} options={productOptions} placeholder="Mahsulotni tanlang…" {...form.register(`items.${index}.product_id`)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`item-quantity-${index}`} required>
-                      Miqdor
-                    </Label>
+                  </FormField>
+                  <FormField htmlFor={`item-quantity-${index}`} label="Miqdor" required>
                     <Input id={`item-quantity-${index}`} type="number" step="0.001" {...form.register(`items.${index}.quantity`)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`item-price-${index}`} required>
-                      Narx
-                    </Label>
+                  </FormField>
+                  <FormField htmlFor={`item-price-${index}`} label="Narx" required>
                     <Input id={`item-price-${index}`} type="number" step="0.01" {...form.register(`items.${index}.price`)} />
-                  </div>
+                  </FormField>
                   <div className="space-y-2">
                     <span className="text-sm font-medium text-foreground">Oraliq summa</span>
                     <p className="tabular-nums text-sm text-muted-foreground">{formatMoney(subtotal)}</p>

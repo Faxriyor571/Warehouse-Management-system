@@ -8,6 +8,7 @@ import { storeService } from "@/services/store";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
 
@@ -61,27 +62,29 @@ export default function StockInDetailPage() {
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-lg border">
-              <table className="w-full text-sm">
-                <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium">Mahsulot</th>
-                    <th className="px-4 py-2 text-right font-medium">Miqdor</th>
-                    <th className="px-4 py-2 text-right font-medium">Narx</th>
-                    <th className="px-4 py-2 text-right font-medium">Oraliq summa</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {doc.items.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-2.5">{item.product ? `${item.product.name} (${item.product.sku})` : `Mahsulot #${item.product_id}`}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(item.quantity)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(item.price)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(item.subtotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Mahsulot</TableHead>
+                      <TableHead className="text-right">Miqdor</TableHead>
+                      <TableHead className="text-right">Narx</TableHead>
+                      <TableHead className="text-right">Oraliq summa</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {doc.items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.product ? `${item.product.name} (${item.product.sku})` : `Mahsulot #${item.product_id}`}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatNumber(item.quantity)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatMoney(item.price)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatMoney(item.subtotal)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             <div className="flex justify-end">

@@ -19,12 +19,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
+import { FormField } from "@/components/forms/FormField";
 
 const productFormSchema = z.object({
   name: z.string().min(1, "Nomi to'ldirilishi shart"),
@@ -161,7 +162,7 @@ export default function ProductsPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border">
+      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {isError ? (
           <ErrorState
             onRetry={() => {
@@ -171,45 +172,42 @@ export default function ProductsPage() {
             }}
           />
         ) : isLoading ? (
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <TableSkeleton />
         ) : products.length === 0 ? (
           <EmptyState
             title="Hozircha mahsulotlar yo'q"
             description={isCeo ? "Boshlash uchun birinchi mahsulotingizni qo'shing." : "Mahsulotlar topilmadi."}
+            action={isCeo ? <Button size="sm" onClick={() => setModalProduct("new")}>Yangi mahsulot</Button> : undefined}
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-6 py-2 text-left font-medium">Nomi</th>
-                  <th className="px-6 py-2 text-left font-medium">SKU</th>
-                  <th className="px-6 py-2 text-left font-medium">Kategoriya</th>
-                  <th className="px-6 py-2 text-left font-medium">Birlik</th>
-                  <th className="px-6 py-2 text-right font-medium">Sotuv narxi</th>
-                  <th className="px-6 py-2 text-left font-medium">Holati</th>
-                  {isCeo ? <th className="px-6 py-2 text-right font-medium" /> : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Nomi</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Kategoriya</TableHead>
+                  <TableHead>Birlik</TableHead>
+                  <TableHead className="text-right">Sotuv narxi</TableHead>
+                  <TableHead>Holati</TableHead>
+                  {isCeo ? <TableHead className="text-right" /> : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-2.5 font-medium">{product.name}</td>
-                    <td className="px-6 py-2.5 text-muted-foreground">{product.sku}</td>
-                    <td className="px-6 py-2.5 text-muted-foreground">{product.category?.name ?? "—"}</td>
-                    <td className="px-6 py-2.5 text-muted-foreground">{product.unit?.short_name ?? "—"}</td>
-                    <td className="px-6 py-2.5 text-right tabular-nums">{formatMoney(product.sale_price)}</td>
-                    <td className="px-6 py-2.5">
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{product.sku}</TableCell>
+                    <TableCell className="text-muted-foreground">{product.category?.name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{product.unit?.short_name ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatMoney(product.sale_price)}</TableCell>
+                    <TableCell>
                       <Badge variant={product.is_active ? "success" : "secondary"} dot>
                         {product.is_active ? "Faol" : "Nofaol"}
                       </Badge>
-                    </td>
+                    </TableCell>
                     {isCeo ? (
-                      <td className="px-6 py-2.5">
+                      <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon-sm" onClick={() => setModalProduct(product)} aria-label="Tahrirlash">
                             <Pencil className="size-4" />
@@ -218,12 +216,12 @@ export default function ProductsPage() {
                             <Trash2 className="size-4" />
                           </Button>
                         </div>
-                      </td>
+                      </TableCell>
                     ) : null}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
@@ -246,26 +244,15 @@ export default function ProductsPage() {
       >
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="product-name" required>
-                Nomi
-              </Label>
+            <FormField htmlFor="product-name" label="Nomi" required error={form.formState.errors.name?.message}>
               <Input id="product-name" invalid={!!form.formState.errors.name} {...form.register("name")} />
-              {form.formState.errors.name ? <p className="text-sm text-destructive">{form.formState.errors.name.message}</p> : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="product-sku" required>
-                SKU
-              </Label>
+            </FormField>
+            <FormField htmlFor="product-sku" label="SKU" required error={form.formState.errors.sku?.message}>
               <Input id="product-sku" invalid={!!form.formState.errors.sku} {...form.register("sku")} />
-              {form.formState.errors.sku ? <p className="text-sm text-destructive">{form.formState.errors.sku.message}</p> : null}
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="product-category" required>
-                Kategoriya
-              </Label>
+            <FormField htmlFor="product-category" label="Kategoriya" required error={form.formState.errors.category_id?.message}>
               <Select
                 id="product-category"
                 placeholder="Kategoriyani tanlang…"
@@ -273,14 +260,8 @@ export default function ProductsPage() {
                 invalid={!!form.formState.errors.category_id}
                 {...form.register("category_id")}
               />
-              {form.formState.errors.category_id ? (
-                <p className="text-sm text-destructive">{form.formState.errors.category_id.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="product-unit" required>
-                Birlik
-              </Label>
+            </FormField>
+            <FormField htmlFor="product-unit" label="Birlik" required error={form.formState.errors.unit_id?.message}>
               <Select
                 id="product-unit"
                 placeholder="Birlikni tanlang…"
@@ -288,29 +269,22 @@ export default function ProductsPage() {
                 invalid={!!form.formState.errors.unit_id}
                 {...form.register("unit_id")}
               />
-              {form.formState.errors.unit_id ? (
-                <p className="text-sm text-destructive">{form.formState.errors.unit_id.message}</p>
-              ) : null}
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="product-purchase-price">Tannarx</Label>
+            <FormField htmlFor="product-purchase-price" label="Tannarx">
               <Input id="product-purchase-price" type="number" step="0.01" {...form.register("purchase_price")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="product-sale-price">Sotuv narxi</Label>
+            </FormField>
+            <FormField htmlFor="product-sale-price" label="Sotuv narxi">
               <Input id="product-sale-price" type="number" step="0.01" {...form.register("sale_price")} />
-            </div>
+            </FormField>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="product-barcode">Shtrix-kod</Label>
+          <FormField htmlFor="product-barcode" label="Shtrix-kod">
             <Input id="product-barcode" {...form.register("barcode")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="product-description">Tavsif</Label>
+          </FormField>
+          <FormField htmlFor="product-description" label="Tavsif">
             <Input id="product-description" {...form.register("description")} />
-          </div>
+          </FormField>
         </form>
       </Modal>
 

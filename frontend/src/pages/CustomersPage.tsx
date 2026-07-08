@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { Pencil, Plus, Power } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -16,13 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
+import { FormField } from "@/components/forms/FormField";
+import { SwitchField } from "@/components/forms/SwitchField";
 
 const customerTypeOptions = [
   { label: "Jismoniy shaxs", value: "individual" },
@@ -127,63 +128,65 @@ export default function CustomersPage() {
         }
       />
 
-      <div className="mt-6 overflow-hidden rounded-lg border">
+      <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {customersQuery.isError ? (
           <ErrorState onRetry={() => void customersQuery.refetch()} />
         ) : customersQuery.isLoading ? (
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <TableSkeleton />
         ) : customers.length === 0 ? (
-          <EmptyState title="Hozircha mijozlar yo'q" description="Boshlash uchun birinchi mijozingizni qo'shing." />
+          <EmptyState
+            title="Hozircha mijozlar yo'q"
+            description="Boshlash uchun birinchi mijozingizni qo'shing."
+            action={<Button size="sm" onClick={() => setModalCustomer("new")}>Yangi mijoz</Button>}
+          />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-6 py-2 text-left font-medium">F.I.Sh.</th>
-                <th className="px-6 py-2 text-left font-medium">Turi</th>
-                <th className="px-6 py-2 text-left font-medium">Telefon</th>
-                <th className="px-6 py-2 text-left font-medium">Holati</th>
-                <th className="px-6 py-2 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {customers.map((customer) => (
-                <tr key={customer.id}>
-                  <td className="px-6 py-2.5 font-medium">{customer.full_name}</td>
-                  <td className="px-6 py-2.5 text-muted-foreground">
-                    {customer.customer_type ? typeLabels[customer.customer_type] : "—"}
-                  </td>
-                  <td className="px-6 py-2.5 text-muted-foreground">{customer.phone ?? "—"}</td>
-                  <td className="px-6 py-2.5">
-                    <Badge variant={customer.is_active ? "success" : "secondary"} dot>
-                      {customer.is_active ? "Faol" : "Nofaol"}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-2.5">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon-sm" onClick={() => setModalCustomer(customer)} aria-label="Tahrirlash">
-                        <Pencil className="size-4" />
-                      </Button>
-                      {isCeo ? (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={!customer.is_active}
-                          onClick={() => setDeactivateTarget(customer)}
-                          aria-label="Faolsizlantirish"
-                        >
-                          <Power className="size-4" />
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>F.I.Sh.</TableHead>
+                  <TableHead>Turi</TableHead>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Holati</TableHead>
+                  <TableHead className="text-right" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.full_name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {customer.customer_type ? typeLabels[customer.customer_type] : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{customer.phone ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={customer.is_active ? "success" : "secondary"} dot>
+                        {customer.is_active ? "Faol" : "Nofaol"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setModalCustomer(customer)} aria-label="Tahrirlash">
+                          <Pencil className="size-4" />
                         </Button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {isCeo ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={!customer.is_active}
+                            onClick={() => setDeactivateTarget(customer)}
+                            aria-label="Faolsizlantirish"
+                          >
+                            <Power className="size-4" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
 
@@ -205,51 +208,34 @@ export default function CustomersPage() {
       >
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customer-name" required>
-                F.I.Sh.
-              </Label>
+            <FormField htmlFor="customer-name" label="F.I.Sh." required error={form.formState.errors.full_name?.message}>
               <Input id="customer-name" invalid={!!form.formState.errors.full_name} {...form.register("full_name")} />
-              {form.formState.errors.full_name ? (
-                <p className="text-sm text-destructive">{form.formState.errors.full_name.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-type" required>
-                Mijoz turi
-              </Label>
+            </FormField>
+            <FormField htmlFor="customer-type" label="Mijoz turi" required>
               <Select id="customer-type" options={customerTypeOptions} {...form.register("customer_type")} />
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customer-phone">Telefon</Label>
+            <FormField htmlFor="customer-phone" label="Telefon">
               <Input id="customer-phone" placeholder="+998901234567" {...form.register("phone")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-passport">Pasport</Label>
+            </FormField>
+            <FormField htmlFor="customer-passport" label="Pasport">
               <Input id="customer-passport" {...form.register("passport")} />
-            </div>
+            </FormField>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer-address">Manzil</Label>
+          <FormField htmlFor="customer-address" label="Manzil">
             <Input id="customer-address" {...form.register("address")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer-description">Tavsif</Label>
+          </FormField>
+          <FormField htmlFor="customer-description" label="Tavsif">
             <Input id="customer-description" {...form.register("description")} />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="customer-active">Faol</Label>
-              <p className="text-sm text-muted-foreground">Nofaol mijozlar yangi savdolarda ko'rinmaydi.</p>
-            </div>
-            <Controller
-              control={form.control}
-              name="is_active"
-              render={({ field }) => <Switch id="customer-active" checked={field.value} onCheckedChange={field.onChange} />}
-            />
-          </div>
+          </FormField>
+          <SwitchField
+            control={form.control}
+            name="is_active"
+            htmlFor="customer-active"
+            label="Faol"
+            description="Nofaol mijozlar yangi savdolarda ko'rinmaydi."
+          />
         </form>
       </Modal>
 

@@ -17,6 +17,7 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -192,30 +193,30 @@ export default function DashboardPage() {
                   <EmptyState compact title="So'nggi amaliyotlar yo'q" />
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="border-y bg-muted/50 text-xs uppercase text-muted-foreground">
-                        <tr>
-                          <th className="px-6 py-2 text-left font-medium">Turi</th>
-                          <th className="px-6 py-2 text-left font-medium">Hujjat raqami</th>
-                          <th className="px-6 py-2 text-left font-medium">Sana</th>
-                          <th className="px-6 py-2 text-right font-medium">Summa</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Turi</TableHead>
+                          <TableHead>Hujjat raqami</TableHead>
+                          <TableHead>Sana</TableHead>
+                          <TableHead className="text-right">Summa</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {stats.recent_operations.map((op, i) => (
-                          <tr key={i}>
-                            <td className="px-6 py-2.5">
+                          <TableRow key={i}>
+                            <TableCell>
                               <Badge variant={op.type === "sale" ? "success" : "info"}>
                                 {op.type === "sale" ? "Savdo" : "Kirim"}
                               </Badge>
-                            </td>
-                            <td className="px-6 py-2.5">{op.reference}</td>
-                            <td className="px-6 py-2.5 text-muted-foreground">{formatDateTime(op.date)}</td>
-                            <td className="px-6 py-2.5 text-right tabular-nums">{formatCurrency(op.amount, CURRENCY)}</td>
-                          </tr>
+                            </TableCell>
+                            <TableCell>{op.reference}</TableCell>
+                            <TableCell className="text-muted-foreground">{formatDateTime(op.date)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatCurrency(op.amount, CURRENCY)}</TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>
