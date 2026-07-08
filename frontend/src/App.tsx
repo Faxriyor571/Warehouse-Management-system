@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import axios from "axios";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -5,29 +6,31 @@ import { Toaster } from "sonner";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/layout/app-shell";
+import { PageLoader } from "@/components/feedback/page-loader";
 import { AuthProvider } from "@/providers/auth-provider";
-import CategoriesPage from "@/pages/CategoriesPage";
-import CustomersPage from "@/pages/CustomersPage";
-import DashboardPage from "@/pages/DashboardPage";
-import DebtDetailPage from "@/pages/DebtDetailPage";
-import DebtsPage from "@/pages/DebtsPage";
-import EmployeesPage from "@/pages/EmployeesPage";
-import ExpensesPage from "@/pages/ExpensesPage";
-import InventoryPage from "@/pages/InventoryPage";
 import LoginPage from "@/pages/LoginPage";
-import PaymentMethodsPage from "@/pages/PaymentMethodsPage";
-import ProductsPage from "@/pages/ProductsPage";
-import ReportsPage from "@/pages/ReportsPage";
-import SalesDetailPage from "@/pages/SalesDetailPage";
-import SalesNewPage from "@/pages/SalesNewPage";
-import SalesPage from "@/pages/SalesPage";
-import SettingsPage from "@/pages/SettingsPage";
-import StockInDetailPage from "@/pages/StockInDetailPage";
-import StockInNewPage from "@/pages/StockInNewPage";
-import StockInPage from "@/pages/StockInPage";
-import StoresPage from "@/pages/StoresPage";
-import SuppliersPage from "@/pages/SuppliersPage";
-import UnitsPage from "@/pages/UnitsPage";
+
+const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
+const CustomersPage = lazy(() => import("@/pages/CustomersPage"));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const DebtDetailPage = lazy(() => import("@/pages/DebtDetailPage"));
+const DebtsPage = lazy(() => import("@/pages/DebtsPage"));
+const EmployeesPage = lazy(() => import("@/pages/EmployeesPage"));
+const ExpensesPage = lazy(() => import("@/pages/ExpensesPage"));
+const InventoryPage = lazy(() => import("@/pages/InventoryPage"));
+const PaymentMethodsPage = lazy(() => import("@/pages/PaymentMethodsPage"));
+const ProductsPage = lazy(() => import("@/pages/ProductsPage"));
+const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
+const SalesDetailPage = lazy(() => import("@/pages/SalesDetailPage"));
+const SalesNewPage = lazy(() => import("@/pages/SalesNewPage"));
+const SalesPage = lazy(() => import("@/pages/SalesPage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const StockInDetailPage = lazy(() => import("@/pages/StockInDetailPage"));
+const StockInNewPage = lazy(() => import("@/pages/StockInNewPage"));
+const StockInPage = lazy(() => import("@/pages/StockInPage"));
+const StoresPage = lazy(() => import("@/pages/StoresPage"));
+const SuppliersPage = lazy(() => import("@/pages/SuppliersPage"));
+const UnitsPage = lazy(() => import("@/pages/UnitsPage"));
 
 /**
  * Never retry 4xx client errors (permission/validation/not-found) — they
@@ -56,35 +59,37 @@ export default function App() {
       <Toaster richColors position="top-right" />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppShell />}>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/stores" element={<StoresPage />} />
-                <Route path="/employees" element={<EmployeesPage />} />
-                <Route path="/products" element={<ProductsPage />} />
-                <Route path="/categories" element={<CategoriesPage />} />
-                <Route path="/units" element={<UnitsPage />} />
-                <Route path="/suppliers" element={<SuppliersPage />} />
-                <Route path="/customers" element={<CustomersPage />} />
-                <Route path="/stock-in" element={<StockInPage />} />
-                <Route path="/stock-in/new" element={<StockInNewPage />} />
-                <Route path="/stock-in/:id" element={<StockInDetailPage />} />
-                <Route path="/sales" element={<SalesPage />} />
-                <Route path="/sales/new" element={<SalesNewPage />} />
-                <Route path="/sales/:id" element={<SalesDetailPage />} />
-                <Route path="/debts" element={<DebtsPage />} />
-                <Route path="/debts/:id" element={<DebtDetailPage />} />
-                <Route path="/expenses" element={<ExpensesPage />} />
-                <Route path="/inventory" element={<InventoryPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/payment-methods" element={<PaymentMethodsPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppShell />}>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/stores" element={<StoresPage />} />
+                  <Route path="/employees" element={<EmployeesPage />} />
+                  <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/categories" element={<CategoriesPage />} />
+                  <Route path="/units" element={<UnitsPage />} />
+                  <Route path="/suppliers" element={<SuppliersPage />} />
+                  <Route path="/customers" element={<CustomersPage />} />
+                  <Route path="/stock-in" element={<StockInPage />} />
+                  <Route path="/stock-in/new" element={<StockInNewPage />} />
+                  <Route path="/stock-in/:id" element={<StockInDetailPage />} />
+                  <Route path="/sales" element={<SalesPage />} />
+                  <Route path="/sales/new" element={<SalesNewPage />} />
+                  <Route path="/sales/:id" element={<SalesDetailPage />} />
+                  <Route path="/debts" element={<DebtsPage />} />
+                  <Route path="/debts/:id" element={<DebtDetailPage />} />
+                  <Route path="/expenses" element={<ExpensesPage />} />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/payment-methods" element={<PaymentMethodsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
               </Route>
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
