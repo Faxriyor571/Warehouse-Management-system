@@ -9,6 +9,9 @@ import { AuthProvider } from "@/providers/auth-provider";
 import CategoriesPage from "@/pages/CategoriesPage";
 import CustomersPage from "@/pages/CustomersPage";
 import DashboardPage from "@/pages/DashboardPage";
+import DebtDetailPage from "@/pages/DebtDetailPage";
+import DebtsPage from "@/pages/DebtsPage";
+import ExpensesPage from "@/pages/ExpensesPage";
 import LoginPage from "@/pages/LoginPage";
 import ProductsPage from "@/pages/ProductsPage";
 import SalesDetailPage from "@/pages/SalesDetailPage";
@@ -65,6 +68,9 @@ export default function App() {
                 <Route path="/sales" element={<SalesPage />} />
                 <Route path="/sales/new" element={<SalesNewPage />} />
                 <Route path="/sales/:id" element={<SalesDetailPage />} />
+                <Route path="/debts" element={<DebtsPage />} />
+                <Route path="/debts/:id" element={<DebtDetailPage />} />
+                <Route path="/expenses" element={<ExpensesPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
