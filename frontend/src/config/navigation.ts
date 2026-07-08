@@ -1,10 +1,30 @@
-import { Boxes, Download, LayoutDashboard, Receipt, Ruler, ShoppingCart, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Boxes,
+  CreditCard,
+  Download,
+  LayoutDashboard,
+  Receipt,
+  Ruler,
+  Settings,
+  ShoppingCart,
+  Store,
+  Tag,
+  Truck,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+
+import type { UserRole } from "@/types/auth";
 
 export interface NavItem {
   id: string;
   title: string;
   href: string;
   icon: LucideIcon;
+  /** Omit to show to everyone (including the legacy admin, role === null). */
+  roles?: Array<UserRole | null>;
 }
 
 export interface NavSection {
@@ -48,6 +68,21 @@ export const navSections: NavSection[] = [
       { id: "sales", title: "Savdo", href: "/sales", icon: ShoppingCart },
       { id: "debts", title: "Qarzlar", href: "/debts", icon: Wallet },
       { id: "expenses", title: "Xarajatlar", href: "/expenses", icon: Receipt },
+    ],
+  },
+  {
+    id: "insights",
+    label: "TAHLIL",
+    items: [{ id: "reports", title: "Hisobotlar", href: "/reports", icon: BarChart3 }],
+  },
+  {
+    id: "settings",
+    label: "SOZLAMALAR",
+    // CEO only (or the legacy admin, role === null) — a Seller has no
+    // backend access to Settings or Payment Method management.
+    items: [
+      { id: "payment-methods", title: "To'lov turlari", href: "/payment-methods", icon: CreditCard, roles: ["ceo", null] },
+      { id: "settings", title: "Sozlamalar", href: "/settings", icon: Settings, roles: ["ceo", null] },
     ],
   },
 ];

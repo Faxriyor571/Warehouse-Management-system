@@ -13,10 +13,13 @@ import DebtDetailPage from "@/pages/DebtDetailPage";
 import DebtsPage from "@/pages/DebtsPage";
 import ExpensesPage from "@/pages/ExpensesPage";
 import LoginPage from "@/pages/LoginPage";
+import PaymentMethodsPage from "@/pages/PaymentMethodsPage";
 import ProductsPage from "@/pages/ProductsPage";
+import ReportsPage from "@/pages/ReportsPage";
 import SalesDetailPage from "@/pages/SalesDetailPage";
 import SalesNewPage from "@/pages/SalesNewPage";
 import SalesPage from "@/pages/SalesPage";
+import SettingsPage from "@/pages/SettingsPage";
 import StockInDetailPage from "@/pages/StockInDetailPage";
 import StockInNewPage from "@/pages/StockInNewPage";
 import StockInPage from "@/pages/StockInPage";
@@ -71,6 +74,9 @@ export default function App() {
                 <Route path="/debts" element={<DebtsPage />} />
                 <Route path="/debts/:id" element={<DebtDetailPage />} />
                 <Route path="/expenses" element={<ExpensesPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/payment-methods" element={<PaymentMethodsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

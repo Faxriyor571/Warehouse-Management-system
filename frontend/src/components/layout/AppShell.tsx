@@ -3,9 +3,18 @@ import { Warehouse } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { navSections } from "@/config/navigation";
+import { useAuth } from "@/providers/auth-provider";
 import { Topbar } from "./Topbar";
 
 export function AppShell() {
+  const { user } = useAuth();
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.roles || item.roles.includes(user?.role ?? null)),
+    }))
+    .filter((section) => section.items.length > 0);
+
   return (
     <div className="grid min-h-svh grid-cols-[16rem_1fr]">
       <aside className="flex flex-col gap-6 border-r bg-card px-3 py-5">
@@ -17,7 +26,7 @@ export function AppShell() {
         </div>
 
         <nav aria-label="Asosiy" className="flex flex-1 flex-col gap-5 overflow-y-auto">
-          {navSections.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.id} className="space-y-0.5">
               {section.label ? (
                 <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
