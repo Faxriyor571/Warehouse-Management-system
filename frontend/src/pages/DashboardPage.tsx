@@ -13,7 +13,6 @@ import { DollarSign, Receipt, ShoppingCart, Users } from "lucide-react";
 
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/formatters";
 import { dashboardService } from "@/services/dashboard";
-import { useAuth } from "@/providers/auth-provider";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -25,26 +24,11 @@ import { ErrorState } from "@/components/feedback/error-state";
 const CURRENCY = "UZS";
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
   const query = useQuery({ queryKey: ["dashboard"], queryFn: dashboardService.getStats });
   const stats = query.data;
 
   return (
-    <div className="min-h-svh">
-      <header className="flex h-14 items-center justify-between border-b px-4 sm:px-6 lg:px-8">
-        <span className="font-semibold">Ombor Boshqaruv Tizimi</span>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span>{user?.full_name}</span>
-          <button
-            onClick={() => void logout()}
-            className="rounded-md border border-input px-3 py-1.5 font-medium hover:bg-accent"
-          >
-            Chiqish
-          </button>
-        </div>
-      </header>
-
-      <ContentContainer>
+    <ContentContainer>
         <PageHeader
           title="Boshqaruv paneli"
           description={
@@ -238,8 +222,7 @@ export default function DashboardPage() {
             </Card>
           </>
         )}
-      </ContentContainer>
-    </div>
+    </ContentContainer>
   );
 }
 
