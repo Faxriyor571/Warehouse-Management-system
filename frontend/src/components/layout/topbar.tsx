@@ -1,4 +1,4 @@
-import { LogOut, Menu, User } from "lucide-react";
+import { ChevronDown, LogOut, Menu, User } from "lucide-react";
 
 import { getInitials } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
@@ -29,7 +29,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const roleLabel = user?.role ? roleLabels[user.role] : "Administrator";
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 lg:justify-end lg:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-background/80 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 sm:px-6 lg:justify-end lg:px-8">
       <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onMenuClick} aria-label="Menyuni ochish">
         <Menu className="size-5" />
       </Button>
@@ -37,13 +37,19 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label="Profil menyusini ochish"
           >
-            <Avatar size="sm">
-              <AvatarFallback>{getInitials(name)}</AvatarFallback>
+            <Avatar size="sm" className="ring-2 ring-background">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
+                {getInitials(name)}
+              </AvatarFallback>
             </Avatar>
-            <span className="hidden text-sm font-medium sm:inline">{name}</span>
+            <span className="hidden flex-col items-start leading-tight sm:flex">
+              <span className="text-sm font-medium text-foreground">{name}</span>
+              <span className="text-[11px] text-muted-foreground">{roleLabel}</span>
+            </span>
+            <ChevronDown className="hidden size-3.5 text-muted-foreground/70 sm:block" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">

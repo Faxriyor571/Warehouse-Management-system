@@ -16,11 +16,16 @@ function SkeletonText({ lines = 3, className }: { lines?: number; className?: st
   );
 }
 
+/** SkeletonCard — mirrors the Dashboard stat-card layout (label, big value, icon chip). */
 function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={cn("space-y-3 rounded-lg border p-6", className)}>
-      <Skeleton className="h-5 w-1/3" />
-      <SkeletonText lines={3} />
+    <div className={cn("flex items-start justify-between gap-4 rounded-xl border p-5", className)}>
+      <div className="space-y-2.5">
+        <Skeleton className="h-3.5 w-24" />
+        <Skeleton className="h-7 w-28" />
+        <Skeleton className="h-3 w-16" />
+      </div>
+      <Skeleton className="size-10 shrink-0 rounded-lg" />
     </div>
   );
 }
