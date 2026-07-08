@@ -6,7 +6,7 @@ import { Pencil, Plus, Power } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
 import type { Customer } from "@/types/customer";
@@ -22,8 +22,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
-import { SwitchField } from "@/components/forms/SwitchField";
+import { FormField } from "@/components/forms/form-field";
+import { SwitchField } from "@/components/forms/switch-field";
 
 const customerTypeOptions = [
   { label: "Jismoniy shaxs", value: "individual" },
@@ -84,7 +84,7 @@ export default function CustomersPage() {
       setModalCustomer(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const updateMutation = useMutation({
@@ -94,7 +94,7 @@ export default function CustomersPage() {
       setModalCustomer(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const deactivateMutation = useMutation({
@@ -104,7 +104,7 @@ export default function CustomersPage() {
       setDeactivateTarget(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const onSubmit = (values: CustomerFormValues) => {

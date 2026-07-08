@@ -6,7 +6,7 @@ import { Pencil, Plus, Power } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { useAuth } from "@/providers/auth-provider";
 import { storeService } from "@/services/store";
 import type { Store } from "@/types/store";
@@ -21,7 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
+import { FormField } from "@/components/forms/form-field";
 
 const storeFormSchema = z.object({
   name: z.string().min(2, "Nomi kamida 2 belgidan iborat bo'lishi kerak"),
@@ -63,7 +63,7 @@ export default function StoresPage() {
       setModalStore(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const updateMutation = useMutation({
@@ -73,7 +73,7 @@ export default function StoresPage() {
       setModalStore(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const deactivateMutation = useMutation({
@@ -83,7 +83,7 @@ export default function StoresPage() {
       setDeactivateTarget(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const onSubmit = (values: StoreFormValues) => {

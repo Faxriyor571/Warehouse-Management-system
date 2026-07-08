@@ -7,7 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { formatMoney } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
@@ -20,7 +20,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { FormField } from "@/components/forms/FormField";
+import { FormField } from "@/components/forms/form-field";
 
 const lineItemSchema = z.object({
   product_id: z.string().min(1, "Mahsulotni tanlash shart"),
@@ -111,7 +111,7 @@ export default function SalesNewPage() {
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       navigate(`/sales/${created.id}`);
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const onSubmit = (values: SaleFormSchemaValues) => {

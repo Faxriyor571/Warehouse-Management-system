@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Printer, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { formatDateTime, formatMoney, formatNumber } from "@/lib/formatters";
 import { saleService } from "@/services/sale";
 import { storeService } from "@/services/store";
@@ -18,7 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
+import { FormField } from "@/components/forms/form-field";
 
 const paymentStatusLabels: Record<PaymentStatus, string> = {
   paid: "To'liq to'langan",
@@ -58,7 +58,7 @@ export default function SalesDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["sales", saleId] });
       void queryClient.invalidateQueries({ queryKey: ["sales", saleId, "returns"] });
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const openReturnModal = () => {

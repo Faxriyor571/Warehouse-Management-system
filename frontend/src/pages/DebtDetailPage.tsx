@@ -7,7 +7,7 @@ import { CalendarClock, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/formatters";
 import { debtService } from "@/services/debt";
 import { paymentMethodService } from "@/services/payment-method";
@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
+import { FormField } from "@/components/forms/form-field";
 
 const statusLabels: Record<DebtStatus, string> = {
   active: "Faol",
@@ -96,7 +96,7 @@ export default function DebtDetailPage() {
       paymentForm.reset({ amount: 0, payment_method_id: "", note: "" });
       invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const dueDateMutation = useMutation({
@@ -106,7 +106,7 @@ export default function DebtDetailPage() {
       setDueDateModalOpen(false);
       invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   return (

@@ -6,7 +6,7 @@ import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { settingService } from "@/services/setting";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
+import { FormField } from "@/components/forms/form-field";
 
 const settingFormSchema = z.object({
   key: z.string().min(1, "Kalit to'ldirilishi shart").max(100),
@@ -53,7 +53,7 @@ export default function SettingsPage() {
       setModalEntry(null);
       void queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const isEditingExisting = modalEntry !== null && modalEntry !== "new";

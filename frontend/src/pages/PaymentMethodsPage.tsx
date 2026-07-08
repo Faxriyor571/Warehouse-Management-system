@@ -6,7 +6,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { paymentMethodService } from "@/services/payment-method";
 import type { PaymentMethod } from "@/types/payment-method";
 import { ContentContainer } from "@/components/layout/content-container";
@@ -21,8 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
-import { SwitchField } from "@/components/forms/SwitchField";
+import { FormField } from "@/components/forms/form-field";
+import { SwitchField } from "@/components/forms/switch-field";
 
 const typeOptions = [
   { label: "Naqd", value: "cash" },
@@ -78,7 +78,7 @@ export default function PaymentMethodsPage() {
       setModalMethod(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const updateMutation = useMutation({
@@ -88,7 +88,7 @@ export default function PaymentMethodsPage() {
       setModalMethod(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const deleteMutation = useMutation({
@@ -98,7 +98,7 @@ export default function PaymentMethodsPage() {
       setDeleteTarget(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const onSubmit = (values: FormValues) => {

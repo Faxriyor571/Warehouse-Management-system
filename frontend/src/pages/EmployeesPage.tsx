@@ -6,7 +6,7 @@ import { KeyRound, Pencil, Plus, Power } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { formatDateTime } from "@/lib/formatters";
 import { employeeService } from "@/services/employee";
 import { storeService } from "@/services/store";
@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
+import { FormField } from "@/components/forms/form-field";
 
 const createFormSchema = z.object({
   username: z.string().min(3, "Kamida 3 belgidan iborat bo'lishi kerak"),
@@ -107,7 +107,7 @@ export default function EmployeesPage() {
       setModalEmployee(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const updateMutation = useMutation({
@@ -117,7 +117,7 @@ export default function EmployeesPage() {
       setModalEmployee(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const activateMutation = useMutation({
@@ -126,7 +126,7 @@ export default function EmployeesPage() {
       toast.success("Sotuvchi faollashtirildi.");
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const deactivateMutation = useMutation({
@@ -136,7 +136,7 @@ export default function EmployeesPage() {
       setDeactivateTarget(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const passwordMutation = useMutation({
@@ -145,7 +145,7 @@ export default function EmployeesPage() {
       toast.success("Parol tiklandi.");
       setPasswordTarget(null);
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const employees = employeesQuery.data ?? [];

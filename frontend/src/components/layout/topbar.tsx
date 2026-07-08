@@ -1,8 +1,9 @@
-import { LogOut, User } from "lucide-react";
+import { LogOut, Menu, User } from "lucide-react";
 
 import { getInitials } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,13 +19,21 @@ const roleLabels: Record<string, string> = {
   super_admin: "Administrator",
 };
 
-export function Topbar() {
+export interface TopbarProps {
+  onMenuClick: () => void;
+}
+
+export function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuth();
   const name = user?.full_name ?? "";
   const roleLabel = user?.role ? roleLabels[user.role] : "Administrator";
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-end border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 lg:justify-end lg:px-8">
+      <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onMenuClick} aria-label="Menyuni ochish">
+        <Menu className="size-5" />
+      </Button>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

@@ -1,13 +1,17 @@
-import { NavLink, Outlet } from "react-router-dom";
+import * as React from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Warehouse } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { navSections } from "@/config/navigation";
 import { useAuth } from "@/providers/auth-provider";
-import { Topbar } from "./Topbar";
+import { Topbar } from "./topbar";
 
 export function AppShell() {
   const { user } = useAuth();
+  const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+
   const visibleSections = navSections
     .map((section) => ({
       ...section,
@@ -15,9 +19,26 @@ export function AppShell() {
     }))
     .filter((section) => section.items.length > 0);
 
+  React.useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="grid min-h-svh grid-cols-[16rem_1fr]">
-      <aside className="flex flex-col gap-6 border-r bg-card px-3 py-5">
+    <div className="min-h-svh lg:grid lg:grid-cols-[16rem_1fr]">
+      {mobileNavOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden
+        />
+      ) : null}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col gap-6 border-r bg-card px-3 py-5 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
+          mobileNavOpen && "translate-x-0"
+        )}
+      >
         <div className="flex items-center gap-2.5 px-2 text-base font-semibold tracking-tight">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Warehouse className="size-[18px]" />
@@ -57,7 +78,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <Topbar />
+        <Topbar onMenuClick={() => setMobileNavOpen((v) => !v)} />
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>

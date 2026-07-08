@@ -6,7 +6,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getErrorMessage } from "@/lib/http";
+import { toastMutationError } from "@/lib/mutation";
 import { formatNumber } from "@/lib/formatters";
 import { unitService } from "@/services/unit";
 import type { Unit } from "@/types/unit";
@@ -21,8 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-import { FormField } from "@/components/forms/FormField";
-import { SwitchField } from "@/components/forms/SwitchField";
+import { FormField } from "@/components/forms/form-field";
+import { SwitchField } from "@/components/forms/switch-field";
 
 const unitFormSchema = z.object({
   name: z.string().min(1, "Nomi to'ldirilishi shart"),
@@ -71,7 +71,7 @@ export default function UnitsPage() {
       setModalUnit(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const updateMutation = useMutation({
@@ -81,7 +81,7 @@ export default function UnitsPage() {
       setModalUnit(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const deleteMutation = useMutation({
@@ -91,7 +91,7 @@ export default function UnitsPage() {
       setDeleteTarget(null);
       void invalidate();
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error)),
+    onError: toastMutationError,
   });
 
   const onSubmit = (values: UnitFormValues) => {

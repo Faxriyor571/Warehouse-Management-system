@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AppShell } from "@/components/layout/AppShell";
+import { AppShell } from "@/components/layout/app-shell";
 import { AuthProvider } from "@/providers/auth-provider";
 import CategoriesPage from "@/pages/CategoriesPage";
 import CustomersPage from "@/pages/CustomersPage";
