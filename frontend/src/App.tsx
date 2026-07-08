@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/providers/auth-provider";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
+import ProductsPage from "@/pages/ProductsPage";
 import StoresPage from "@/pages/StoresPage";
 
 /**
@@ -43,6 +44,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/stores" element={<StoresPage />} />
+                <Route path="/products" element={<ProductsPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
