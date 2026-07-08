@@ -1,3 +1,5 @@
+import type { CustomerBrief, PaymentMethodBrief } from "./common";
+
 export type DebtStatus = "active" | "paid" | "overdue";
 
 export interface DebtPayment {
@@ -7,7 +9,7 @@ export interface DebtPayment {
   payment_method_id: number;
   date: string;
   note: string | null;
-  payment_method: { id: number; name: string; type: string } | null;
+  payment_method: PaymentMethodBrief | null;
 }
 
 export interface Debt {
@@ -24,7 +26,7 @@ export interface Debt {
   status: DebtStatus;
   note: string | null;
   created_at: string;
-  customer: { id: number; full_name: string } | null;
+  customer: CustomerBrief | null;
 }
 
 export interface DebtDetail extends Debt {

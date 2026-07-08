@@ -1,3 +1,5 @@
+import type { UserBrief } from "./common";
+
 export type ExpenseType = "fuel" | "driver" | "loader" | "other";
 
 export interface Expense {
@@ -10,7 +12,7 @@ export interface Expense {
   description: string;
   date: string;
   created_at: string;
-  created_by: { id: number; full_name: string } | null;
+  created_by: UserBrief | null;
 }
 
 export interface ExpenseListParams {

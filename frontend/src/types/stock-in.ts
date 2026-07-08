@@ -1,10 +1,12 @@
+import type { NamedBrief, ProductBrief, UserBrief } from "./common";
+
 export interface StockInItem {
   id: number;
   product_id: number;
   quantity: string;
   price: string;
   subtotal: string;
-  product: { id: number; name: string; sku: string } | null;
+  product: ProductBrief | null;
 }
 
 export interface StockIn {
@@ -16,8 +18,8 @@ export interface StockIn {
   date: string;
   total_amount: string;
   note: string | null;
-  supplier: { id: number; name: string } | null;
-  created_by: { id: number; full_name: string } | null;
+  supplier: NamedBrief | null;
+  created_by: UserBrief | null;
   items: StockInItem[];
 }
 

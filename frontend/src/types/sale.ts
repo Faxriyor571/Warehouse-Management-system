@@ -1,3 +1,5 @@
+import type { CustomerBrief, PaymentMethodBrief, ProductBrief, UserBrief } from "./common";
+
 export type PaymentStatus = "paid" | "partial" | "unpaid";
 
 export interface SaleItem {
@@ -7,7 +9,7 @@ export interface SaleItem {
   price: string;
   discount: string;
   subtotal: string;
-  product: { id: number; name: string; sku: string } | null;
+  product: ProductBrief | null;
 }
 
 export interface SalePayment {
@@ -17,7 +19,7 @@ export interface SalePayment {
   amount: string;
   date: string;
   note: string | null;
-  payment_method: { id: number; name: string; type: string } | null;
+  payment_method: PaymentMethodBrief | null;
 }
 
 export interface Sale {
@@ -34,8 +36,8 @@ export interface Sale {
   payment_status: PaymentStatus;
   note: string | null;
   created_at: string;
-  customer: { id: number; full_name: string } | null;
-  created_by: { id: number; full_name: string } | null;
+  customer: CustomerBrief | null;
+  created_by: UserBrief | null;
   items: SaleItem[];
   payments: SalePayment[];
 }
