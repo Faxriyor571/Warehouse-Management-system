@@ -130,7 +130,7 @@ export default function CustomersPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {customersQuery.isError ? (
-          <ErrorState onRetry={() => void customersQuery.refetch()} />
+          <ErrorState error={customersQuery.error} onRetry={() => void customersQuery.refetch()} />
         ) : customersQuery.isLoading ? (
           <TableSkeleton />
         ) : customers.length === 0 ? (

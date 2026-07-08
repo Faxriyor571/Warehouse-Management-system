@@ -5,12 +5,10 @@ import {
   Download,
   LayoutDashboard,
   Receipt,
-  Ruler,
   Settings,
   ShoppingCart,
   Store,
   Tag,
-  Truck,
   UserCog,
   Users,
   Wallet,
@@ -56,16 +54,12 @@ export const navSections: NavSection[] = [
     items: [
       { id: "products", title: "Mahsulotlar", href: "/products", icon: Boxes },
       { id: "categories", title: "Kategoriyalar", href: "/categories", icon: Tag },
-      { id: "units", title: "Birliklar", href: "/units", icon: Ruler },
     ],
   },
   {
     id: "partners",
     label: "HAMKORLAR",
-    items: [
-      { id: "suppliers", title: "Yetkazib beruvchilar", href: "/suppliers", icon: Truck },
-      { id: "customers", title: "Mijozlar", href: "/customers", icon: Users },
-    ],
+    items: [{ id: "customers", title: "Mijozlar", href: "/customers", icon: Users }],
   },
   {
     id: "operations",

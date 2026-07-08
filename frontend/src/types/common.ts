@@ -24,12 +24,6 @@ export interface CustomerBrief {
   full_name: string;
 }
 
-/** Minimal named-entity reference embedded in other resources (e.g. `supplier`). */
-export interface NamedBrief {
-  id: number;
-  name: string;
-}
-
 /** Minimal payment method reference embedded in payment records. */
 export interface PaymentMethodBrief {
   id: number;

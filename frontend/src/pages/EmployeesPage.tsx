@@ -165,7 +165,7 @@ export default function EmployeesPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {employeesQuery.isError ? (
-          <ErrorState onRetry={() => void employeesQuery.refetch()} />
+          <ErrorState error={employeesQuery.error} onRetry={() => void employeesQuery.refetch()} />
         ) : employeesQuery.isLoading ? (
           <TableSkeleton />
         ) : employees.length === 0 ? (

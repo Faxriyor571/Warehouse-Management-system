@@ -107,7 +107,7 @@ export default function CategoriesPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {categoriesQuery.isError ? (
-          <ErrorState onRetry={() => void categoriesQuery.refetch()} />
+          <ErrorState error={categoriesQuery.error} onRetry={() => void categoriesQuery.refetch()} />
         ) : categoriesQuery.isLoading ? (
           <TableSkeleton />
         ) : categories.length === 0 ? (

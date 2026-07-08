@@ -13,7 +13,6 @@ import { useAuth } from "@/providers/auth-provider";
 import { productService } from "@/services/product";
 import { stockInService } from "@/services/stock-in";
 import { storeService } from "@/services/store";
-import { supplierService } from "@/services/supplier";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,6 @@ const lineItemSchema = z.object({
 
 const stockInFormSchema = z.object({
   store_id: z.string().optional(),
-  supplier_id: z.string().optional(),
   date: z.string().optional(),
   note: z.string().optional(),
   items: z.array(lineItemSchema).min(1, "Kamida bitta qator qo'shing"),
@@ -47,23 +45,18 @@ export default function StockInNewPage() {
 
   const form = useForm<StockInFormValues>({
     resolver: zodResolver(stockInFormSchema),
-    defaultValues: { store_id: "", supplier_id: "", date: "", note: "", items: [{ product_id: "", quantity: 1, price: 0 }] },
+    defaultValues: { store_id: "", date: "", note: "", items: [{ product_id: "", quantity: 1, price: 0 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const watchedItems = form.watch("items");
 
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
-  const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: supplierService.list });
   const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
 
   const storeOptions = React.useMemo(
     () => (storesQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
     [storesQuery.data]
-  );
-  const supplierOptions = React.useMemo(
-    () => (suppliersQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
-    [suppliersQuery.data]
   );
   const productOptions = React.useMemo(
     () => (productsQuery.data ?? []).map((p) => ({ label: `${p.name} (${p.sku})`, value: String(p.id) })),
@@ -95,15 +88,12 @@ export default function StockInNewPage() {
       <PageHeader title="Yangi kirim" description="Kirimni qayd eting. Saqlangach ombordagi qoldiq avtomatik oshadi." />
 
       <form className="mt-6 space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {isCeo ? (
             <FormField htmlFor="stock-in-store" label="Do'kon" required error={form.formState.errors.store_id?.message}>
               <Select id="stock-in-store" options={storeOptions} placeholder="Do'konni tanlang…" invalid={!!form.formState.errors.store_id} {...form.register("store_id")} />
             </FormField>
           ) : null}
-          <FormField htmlFor="stock-in-supplier" label="Yetkazib beruvchi">
-            <Select id="stock-in-supplier" options={supplierOptions} placeholder="Yetkazib beruvchini tanlang…" {...form.register("supplier_id")} />
-          </FormField>
           <FormField htmlFor="stock-in-date" label="Sana">
             <Input id="stock-in-date" type="datetime-local" {...form.register("date")} />
           </FormField>

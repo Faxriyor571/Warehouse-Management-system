@@ -126,7 +126,7 @@ export default function SalesPage() {
 
         <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
           {salesQuery.isError ? (
-            <ErrorState onRetry={() => void salesQuery.refetch()} />
+            <ErrorState error={salesQuery.error} onRetry={() => void salesQuery.refetch()} />
           ) : salesQuery.isLoading ? (
             <TableSkeleton />
           ) : items.length === 0 ? (

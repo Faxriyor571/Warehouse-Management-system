@@ -42,7 +42,7 @@ export default function StockInDetailPage() {
 
       <div className="mt-6">
         {stockInQuery.isError ? (
-          <ErrorState onRetry={() => void stockInQuery.refetch()} />
+          <ErrorState error={stockInQuery.error} onRetry={() => void stockInQuery.refetch()} />
         ) : stockInQuery.isLoading || !doc ? (
           <div className="space-y-4">
             <Skeleton className="h-24 w-full" />
@@ -50,13 +50,12 @@ export default function StockInDetailPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Sana" value={formatDateTime(doc.date)} />
               <Field label="Do'kon" value={store?.name ?? "—"} />
-              <Field label="Yetkazib beruvchi" value={doc.supplier?.name ?? "—"} />
               <Field label="Yaratgan xodim" value={doc.created_by?.full_name ?? "—"} />
               {doc.note ? (
-                <div className="sm:col-span-2 lg:col-span-4">
+                <div className="sm:col-span-2 lg:col-span-3">
                   <Field label="Izoh" value={doc.note} />
                 </div>
               ) : null}

@@ -108,7 +108,7 @@ export default function DebtsPage() {
 
         <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
           {debtsQuery.isError ? (
-            <ErrorState onRetry={() => void debtsQuery.refetch()} />
+            <ErrorState error={debtsQuery.error} onRetry={() => void debtsQuery.refetch()} />
           ) : debtsQuery.isLoading ? (
             <TableSkeleton />
           ) : items.length === 0 ? (

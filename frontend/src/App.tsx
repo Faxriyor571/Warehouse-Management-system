@@ -29,8 +29,6 @@ const StockInDetailPage = lazy(() => import("@/pages/StockInDetailPage"));
 const StockInNewPage = lazy(() => import("@/pages/StockInNewPage"));
 const StockInPage = lazy(() => import("@/pages/StockInPage"));
 const StoresPage = lazy(() => import("@/pages/StoresPage"));
-const SuppliersPage = lazy(() => import("@/pages/SuppliersPage"));
-const UnitsPage = lazy(() => import("@/pages/UnitsPage"));
 
 /**
  * Never retry 4xx client errors (permission/validation/not-found) — they
@@ -69,8 +67,6 @@ export default function App() {
                   <Route path="/employees" element={<EmployeesPage />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/categories" element={<CategoriesPage />} />
-                  <Route path="/units" element={<UnitsPage />} />
-                  <Route path="/suppliers" element={<SuppliersPage />} />
                   <Route path="/customers" element={<CustomersPage />} />
                   <Route path="/stock-in" element={<StockInPage />} />
                   <Route path="/stock-in/new" element={<StockInNewPage />} />

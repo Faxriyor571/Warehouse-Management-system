@@ -111,7 +111,7 @@ export default function StoresPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {storesQuery.isError ? (
-          <ErrorState onRetry={() => void storesQuery.refetch()} />
+          <ErrorState error={storesQuery.error} onRetry={() => void storesQuery.refetch()} />
         ) : storesQuery.isLoading ? (
           <TableSkeleton />
         ) : stores.length === 0 ? (

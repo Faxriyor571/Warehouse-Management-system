@@ -141,7 +141,7 @@ export default function ExpensesPage() {
 
         <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
           {expensesQuery.isError ? (
-            <ErrorState onRetry={() => void expensesQuery.refetch()} />
+            <ErrorState error={expensesQuery.error} onRetry={() => void expensesQuery.refetch()} />
           ) : expensesQuery.isLoading ? (
             <TableSkeleton />
           ) : items.length === 0 ? (

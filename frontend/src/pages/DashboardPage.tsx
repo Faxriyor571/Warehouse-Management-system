@@ -42,7 +42,7 @@ export default function DashboardPage() {
         />
 
         {query.isError ? (
-          <ErrorState className="mt-6" onRetry={() => void query.refetch()} />
+          <ErrorState error={query.error} className="mt-6" onRetry={() => void query.refetch()} />
         ) : (
           <>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

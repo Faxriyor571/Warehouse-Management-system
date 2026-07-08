@@ -144,6 +144,7 @@ export default function ProductsPage() {
 
   const isEditing = modalProduct !== null;
   const isError = productsQuery.isError || categoriesQuery.isError || unitsQuery.isError;
+  const firstError = productsQuery.error ?? categoriesQuery.error ?? unitsQuery.error;
   const isLoading = productsQuery.isLoading || categoriesQuery.isLoading || unitsQuery.isLoading;
   const products = productsQuery.data ?? [];
 
@@ -165,6 +166,7 @@ export default function ProductsPage() {
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {isError ? (
           <ErrorState
+            error={firstError}
             onRetry={() => {
               void productsQuery.refetch();
               void categoriesQuery.refetch();

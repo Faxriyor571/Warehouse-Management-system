@@ -124,7 +124,7 @@ export default function PaymentMethodsPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {methodsQuery.isError ? (
-          <ErrorState onRetry={() => void methodsQuery.refetch()} />
+          <ErrorState error={methodsQuery.error} onRetry={() => void methodsQuery.refetch()} />
         ) : methodsQuery.isLoading ? (
           <TableSkeleton />
         ) : methods.length === 0 ? (

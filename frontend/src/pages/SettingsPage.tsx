@@ -74,7 +74,7 @@ export default function SettingsPage() {
 
       <div className="mt-6 overflow-hidden rounded-lg border bg-card shadow-xs">
         {settingsQuery.isError ? (
-          <ErrorState onRetry={() => void settingsQuery.refetch()} />
+          <ErrorState error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} />
         ) : settingsQuery.isLoading ? (
           <TableSkeleton />
         ) : entries.length === 0 ? (

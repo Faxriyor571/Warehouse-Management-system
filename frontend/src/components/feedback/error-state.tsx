@@ -1,9 +1,15 @@
 import * as React from "react";
-import { AlertOctagon, RotateCw } from "lucide-react";
+import axios from "axios";
+import { AlertOctagon, RotateCw, ShieldAlert } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/http";
 
 export interface ErrorStateProps {
+  /** The caught query/mutation error, if available. A 403 renders a distinct
+   * permission-denied state (no retry button — retrying won't change the
+   * caller's permissions) instead of the generic message. */
+  error?: unknown;
   title?: string;
   description?: React.ReactNode;
   onRetry?: () => void;
@@ -13,13 +19,23 @@ export interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = "Xatolik yuz berdi",
-  description = "Kutilmagan xatolik yuz berdi. Qaytadan urinib ko'ring.",
+  error,
+  title,
+  description,
   onRetry,
   retryLabel = "Qaytadan urinish",
   className,
   compact,
 }: ErrorStateProps) {
+  const isForbidden = axios.isAxiosError(error) && error.response?.status === 403;
+
+  const resolvedTitle = title ?? (isForbidden ? "Ruxsat berilmagan" : "Xatolik yuz berdi");
+  const resolvedDescription =
+    description ?? (isForbidden ? getErrorMessage(error) : "Kutilmagan xatolik yuz berdi. Qaytadan urinib ko'ring.");
+  // A 403 won't resolve by retrying with the same session — only offer retry
+  // for transient/unknown failures, unless the caller explicitly forces it.
+  const showRetry = onRetry && !isForbidden;
+
   return (
     <div
       role="alert"
@@ -35,15 +51,19 @@ export function ErrorState({
           compact ? "size-10" : "size-14"
         )}
       >
-        <AlertOctagon className={compact ? "size-5" : "size-7"} aria-hidden />
+        {isForbidden ? (
+          <ShieldAlert className={compact ? "size-5" : "size-7"} aria-hidden />
+        ) : (
+          <AlertOctagon className={compact ? "size-5" : "size-7"} aria-hidden />
+        )}
       </div>
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {description ? (
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">{description}</p>
+        <h3 className="text-sm font-semibold text-foreground">{resolvedTitle}</h3>
+        {resolvedDescription ? (
+          <p className="mx-auto max-w-sm text-sm text-muted-foreground">{resolvedDescription}</p>
         ) : null}
       </div>
-      {onRetry ? (
+      {showRetry ? (
         <button
           type="button"
           onClick={onRetry}

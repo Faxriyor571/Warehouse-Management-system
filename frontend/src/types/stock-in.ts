@@ -1,4 +1,4 @@
-import type { NamedBrief, ProductBrief, UserBrief } from "./common";
+import type { ProductBrief, UserBrief } from "./common";
 
 export interface StockInItem {
   id: number;
@@ -13,19 +13,16 @@ export interface StockIn {
   id: number;
   reference: string;
   store_id: number | null;
-  supplier_id: number | null;
   created_by_id: number;
   date: string;
   total_amount: string;
   note: string | null;
-  supplier: NamedBrief | null;
   created_by: UserBrief | null;
   items: StockInItem[];
 }
 
 export interface StockInListParams {
   store_id?: number;
-  supplier_id?: number;
   search?: string;
   date_from?: string;
   date_to?: string;
@@ -39,7 +36,6 @@ export interface StockInItemFormValues {
 
 export interface StockInFormValues {
   store_id?: string;
-  supplier_id?: string;
   date?: string;
   note?: string;
   items: StockInItemFormValues[];

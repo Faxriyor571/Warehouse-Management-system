@@ -127,7 +127,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
 function SalesReportView({ params }: { params: { store_id?: number; date_from?: string; date_to?: string } }) {
   const query = useQuery({ queryKey: ["reports", "sales", params], queryFn: () => reportService.sales(params) });
 
-  if (query.isError) return <ErrorState onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (query.isLoading || !query.data) {
     return (
       <div className="space-y-4">
@@ -225,7 +225,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
 function InventoryReportView({ params }: { params: { store_id?: number } }) {
   const query = useQuery({ queryKey: ["reports", "inventory", params], queryFn: () => reportService.inventory(params) });
 
-  if (query.isError) return <ErrorState onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (query.isLoading || !query.data) return <Skeleton className="h-72 w-full" />;
 
   const report = query.data;
@@ -273,7 +273,7 @@ function InventoryReportView({ params }: { params: { store_id?: number } }) {
 function DebtReportView({ params }: { params: { store_id?: number } }) {
   const query = useQuery({ queryKey: ["reports", "debts", params], queryFn: () => reportService.debts(params) });
 
-  if (query.isError) return <ErrorState onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (query.isLoading || !query.data) return <Skeleton className="h-72 w-full" />;
 
   const report = query.data;
@@ -348,7 +348,7 @@ function DebtReportView({ params }: { params: { store_id?: number } }) {
 function ExpenseReportView({ params }: { params: { store_id?: number } }) {
   const query = useQuery({ queryKey: ["reports", "expenses", params], queryFn: () => reportService.expenses(params) });
 
-  if (query.isError) return <ErrorState onRetry={() => void query.refetch()} />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (query.isLoading || !query.data) return <Skeleton className="h-72 w-full" />;
 
   const report = query.data;

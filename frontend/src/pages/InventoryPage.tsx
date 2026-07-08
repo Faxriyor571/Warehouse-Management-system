@@ -116,7 +116,7 @@ function StoreStockView({ storeId }: { storeId?: number }) {
 
       <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
         {query.isError ? (
-          <ErrorState onRetry={() => void query.refetch()} />
+          <ErrorState error={query.error} onRetry={() => void query.refetch()} />
         ) : query.isLoading ? (
           <TableSkeleton />
         ) : items.length === 0 ? (
@@ -235,7 +235,7 @@ function MovementsView({ storeId }: { storeId?: number }) {
 
       <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
         {query.isError ? (
-          <ErrorState onRetry={() => void query.refetch()} />
+          <ErrorState error={query.error} onRetry={() => void query.refetch()} />
         ) : query.isLoading ? (
           <TableSkeleton />
         ) : items.length === 0 ? (

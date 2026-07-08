@@ -132,7 +132,7 @@ export default function DebtDetailPage() {
 
       <div className="mt-6">
         {debtQuery.isError ? (
-          <ErrorState onRetry={() => void debtQuery.refetch()} />
+          <ErrorState error={debtQuery.error} onRetry={() => void debtQuery.refetch()} />
         ) : debtQuery.isLoading || !debt ? (
           <div className="space-y-4">
             <Skeleton className="h-24 w-full" />

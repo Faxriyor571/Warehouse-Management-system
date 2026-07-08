@@ -101,7 +101,7 @@ export default function SalesDetailPage() {
 
       <div className="mt-6">
         {saleQuery.isError ? (
-          <ErrorState onRetry={() => void saleQuery.refetch()} />
+          <ErrorState error={saleQuery.error} onRetry={() => void saleQuery.refetch()} />
         ) : saleQuery.isLoading || !sale ? (
           <div className="space-y-4">
             <Skeleton className="h-24 w-full" />

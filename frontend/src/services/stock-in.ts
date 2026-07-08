@@ -18,7 +18,6 @@ export const stockInService = {
   async create(values: StockInFormValues): Promise<StockIn> {
     const { data } = await http.post<StockIn>("/stock-in", {
       store_id: values.store_id ? Number(values.store_id) : undefined,
-      supplier_id: values.supplier_id ? Number(values.supplier_id) : null,
       date: values.date ? new Date(values.date).toISOString() : undefined,
       note: values.note || null,
       items: values.items.map((item) => ({

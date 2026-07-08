@@ -7,7 +7,6 @@ import { formatDate, formatMoney } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { stockInService } from "@/services/stock-in";
 import { storeService } from "@/services/store";
-import { supplierService } from "@/services/supplier";
 import type { StockInListParams } from "@/types/stock-in";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -28,14 +27,12 @@ export default function StockInPage() {
 
   const [search, setSearch] = React.useState("");
   const [storeId, setStoreId] = React.useState("");
-  const [supplierId, setSupplierId] = React.useState("");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
 
   const params: StockInListParams = {
     ...(search ? { search } : {}),
     ...(storeId ? { store_id: Number(storeId) } : {}),
-    ...(supplierId ? { supplier_id: Number(supplierId) } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
   };
@@ -46,15 +43,10 @@ export default function StockInPage() {
   });
 
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
-  const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: supplierService.list });
 
   const storeOptions = React.useMemo(
     () => (storesQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
     [storesQuery.data]
-  );
-  const supplierOptions = React.useMemo(
-    () => (suppliersQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
-    [suppliersQuery.data]
   );
 
   const items = stockInQuery.data?.items ?? [];
@@ -82,13 +74,6 @@ export default function StockInPage() {
           />
           <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
           <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
-          <Select
-            options={supplierOptions}
-            placeholder="Barcha yetkazib beruvchilar"
-            value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
-            className="w-56"
-          />
           {isCeo ? (
             <Select
               options={storeOptions}
@@ -102,7 +87,7 @@ export default function StockInPage() {
 
         <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
           {stockInQuery.isError ? (
-            <ErrorState onRetry={() => void stockInQuery.refetch()} />
+            <ErrorState error={stockInQuery.error} onRetry={() => void stockInQuery.refetch()} />
           ) : stockInQuery.isLoading ? (
             <TableSkeleton />
           ) : items.length === 0 ? (
@@ -118,7 +103,6 @@ export default function StockInPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Hujjat raqami</TableHead>
                     <TableHead>Sana</TableHead>
-                    <TableHead>Yetkazib beruvchi</TableHead>
                     <TableHead className="text-right">Qatorlar</TableHead>
                     <TableHead className="text-right">Jami</TableHead>
                   </TableRow>
@@ -128,7 +112,6 @@ export default function StockInPage() {
                     <TableRow key={doc.id} className="cursor-pointer" onClick={() => navigate(`/stock-in/${doc.id}`)}>
                       <TableCell className="font-medium">{doc.reference}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(doc.date)}</TableCell>
-                      <TableCell className="text-muted-foreground">{doc.supplier?.name ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{doc.items.length}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatMoney(doc.total_amount)}</TableCell>
                     </TableRow>
