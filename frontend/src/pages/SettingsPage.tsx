@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
+import { useAuth } from "@/providers/auth-provider";
 import { settingService } from "@/services/setting";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -29,6 +30,12 @@ type SettingFormSchemaValues = z.infer<typeof settingFormSchema>;
 type ModalState = "new" | { key: string; value: string | null } | null;
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  // Settings has no separate read/manage tier — require_settings_manage
+  // (CEO or the legacy admin) gates the whole page, so this only matters
+  // for a non-CEO reaching the page directly by URL (the nav item is
+  // already hidden for them) and seeing an action that could only 403.
+  const canManage = user?.role === "ceo" || user?.role == null;
   const queryClient = useQueryClient();
   const [modalEntry, setModalEntry] = React.useState<ModalState>(null);
 
@@ -66,10 +73,12 @@ export default function SettingsPage() {
         title="Sozlamalar"
         description="Kompaniyangizning konfiguratsiya kalit-qiymat juftliklari."
         actions={
-          <Button onClick={() => setModalEntry("new")}>
-            <Plus />
-            Sozlama qo'shish
-          </Button>
+          canManage ? (
+            <Button onClick={() => setModalEntry("new")}>
+              <Plus />
+              Sozlama qo'shish
+            </Button>
+          ) : null
         }
       />
 
@@ -81,8 +90,8 @@ export default function SettingsPage() {
         ) : entries.length === 0 ? (
           <EmptyState
             title="Hozircha sozlamalar yo'q"
-            description="Boshlash uchun birinchi sozlamangizni qo'shing."
-            action={<Button size="sm" onClick={() => setModalEntry("new")}>Sozlama qo'shish</Button>}
+            description={canManage ? "Boshlash uchun birinchi sozlamangizni qo'shing." : "Sozlamalar topilmadi."}
+            action={canManage ? <Button size="sm" onClick={() => setModalEntry("new")}>Sozlama qo'shish</Button> : undefined}
           />
         ) : (
           <Table>
@@ -90,7 +99,7 @@ export default function SettingsPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Kalit</TableHead>
                 <TableHead>Qiymat</TableHead>
-                <TableHead className="text-right" />
+                {canManage ? <TableHead className="text-right" /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -98,11 +107,13 @@ export default function SettingsPage() {
                 <TableRow key={key}>
                   <TableCell className="font-medium">{key}</TableCell>
                   <TableCell className="text-muted-foreground">{value ?? "—"}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon-sm" onClick={() => setModalEntry({ key, value })} aria-label="Tahrirlash">
-                      <Pencil className="size-4" />
-                    </Button>
-                  </TableCell>
+                  {canManage ? (
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => setModalEntry({ key, value })} aria-label="Tahrirlash">
+                        <Pencil className="size-4" />
+                      </Button>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>
