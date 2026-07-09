@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
 import { formatDateTime } from "@/lib/formatters";
+import { useAuth } from "@/providers/auth-provider";
 import { employeeService } from "@/services/employee";
 import { storeService } from "@/services/store";
 import type { Employee } from "@/types/employee";
@@ -52,6 +53,12 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 type ModalState = "new" | Employee | null;
 
 export default function EmployeesPage() {
+  const { user } = useAuth();
+  // Employees is CEO-only on the backend (RequireCEO has no legacy-admin
+  // branch, see app/routers/employees.py) — this page is only reachable via
+  // direct URL for anyone else, since navigation.ts already hides the nav
+  // item. Gate the create action to match, same pattern as StoresPage.
+  const isCeo = user?.role === "ceo";
   const queryClient = useQueryClient();
   const [modalEmployee, setModalEmployee] = React.useState<ModalState>(null);
   const [passwordTarget, setPasswordTarget] = React.useState<Employee | null>(null);
@@ -157,10 +164,12 @@ export default function EmployeesPage() {
         title="Sotuvchilar"
         description="Kompaniyangiz do'konlaridagi sotuvchi xodimlarni boshqaring."
         actions={
-          <Button onClick={() => setModalEmployee("new")}>
-            <Plus />
-            Yangi sotuvchi
-          </Button>
+          isCeo ? (
+            <Button onClick={() => setModalEmployee("new")}>
+              <Plus />
+              Yangi sotuvchi
+            </Button>
+          ) : null
         }
       />
 
@@ -173,7 +182,7 @@ export default function EmployeesPage() {
           <EmptyState
             title="Hozircha sotuvchilar yo'q"
             description="Boshlash uchun birinchi sotuvchingizni qo'shing."
-            action={<Button size="sm" onClick={() => setModalEmployee("new")}>Yangi sotuvchi</Button>}
+            action={isCeo ? <Button size="sm" onClick={() => setModalEmployee("new")}>Yangi sotuvchi</Button> : undefined}
           />
         ) : (
           <div className="overflow-x-auto">

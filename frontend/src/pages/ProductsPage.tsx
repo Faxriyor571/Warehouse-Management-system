@@ -11,7 +11,7 @@ import { formatMoney } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { categoryService } from "@/services/category";
 import { productService } from "@/services/product";
-import { unitService } from "@/services/unit";
+import { unitService, type UnitCreateInput } from "@/services/unit";
 import type { Product } from "@/types/product";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -41,6 +41,12 @@ const productFormSchema = z.object({
 });
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
+const unitFormSchema = z.object({
+  name: z.string().min(1, "Nomi to'ldirilishi shart"),
+  short_name: z.string().min(1, "Qisqartma to'ldirilishi shart"),
+});
+type UnitFormValues = z.infer<typeof unitFormSchema>;
+
 type ModalState = "new" | Product | null;
 
 export default function ProductsPage() {
@@ -49,6 +55,7 @@ export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [modalProduct, setModalProduct] = React.useState<ModalState>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Product | null>(null);
+  const [isUnitModalOpen, setIsUnitModalOpen] = React.useState(false);
 
   const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: categoryService.list });
@@ -134,6 +141,23 @@ export default function ProductsPage() {
       toast.success("Mahsulot o'chirildi.");
       setDeleteTarget(null);
       void invalidate();
+    },
+    onError: toastMutationError,
+  });
+
+  const unitForm = useForm<UnitFormValues>({
+    resolver: zodResolver(unitFormSchema),
+    defaultValues: { name: "", short_name: "" },
+  });
+
+  const createUnitMutation = useMutation({
+    mutationFn: (values: UnitCreateInput) => unitService.create(values),
+    onSuccess: async (unit) => {
+      toast.success("Birlik yaratildi.");
+      unitForm.reset({ name: "", short_name: "" });
+      setIsUnitModalOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["units"] });
+      form.setValue("unit_id", String(unit.id));
     },
     onError: toastMutationError,
   });
@@ -265,13 +289,19 @@ export default function ProductsPage() {
               />
             </FormField>
             <FormField htmlFor="product-unit" label="Birlik" required error={form.formState.errors.unit_id?.message}>
-              <Select
-                id="product-unit"
-                placeholder="Birlikni tanlang…"
-                options={unitOptions}
-                invalid={!!form.formState.errors.unit_id}
-                {...form.register("unit_id")}
-              />
+              <div className="flex gap-2">
+                <Select
+                  id="product-unit"
+                  placeholder="Birlikni tanlang…"
+                  options={unitOptions}
+                  invalid={!!form.formState.errors.unit_id}
+                  className="flex-1"
+                  {...form.register("unit_id")}
+                />
+                <Button type="button" variant="outline" size="icon" onClick={() => setIsUnitModalOpen(true)} aria-label="Yangi birlik">
+                  <Plus className="size-4" />
+                </Button>
+              </div>
             </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -301,6 +331,31 @@ export default function ProductsPage() {
         loading={deleteMutation.isPending}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
       />
+
+      <Modal
+        open={isUnitModalOpen}
+        onOpenChange={(open) => !open && setIsUnitModalOpen(false)}
+        title="Yangi birlik"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsUnitModalOpen(false)}>
+              Bekor qilish
+            </Button>
+            <Button onClick={unitForm.handleSubmit((v) => createUnitMutation.mutate(v))} loading={createUnitMutation.isPending}>
+              Saqlash
+            </Button>
+          </>
+        }
+      >
+        <form className="space-y-4" onSubmit={unitForm.handleSubmit((v) => createUnitMutation.mutate(v))}>
+          <FormField htmlFor="unit-name" label="Nomi" required error={unitForm.formState.errors.name?.message}>
+            <Input id="unit-name" placeholder="Kilogramm" invalid={!!unitForm.formState.errors.name} {...unitForm.register("name")} />
+          </FormField>
+          <FormField htmlFor="unit-short-name" label="Qisqartma" required error={unitForm.formState.errors.short_name?.message}>
+            <Input id="unit-short-name" placeholder="kg" invalid={!!unitForm.formState.errors.short_name} {...unitForm.register("short_name")} />
+          </FormField>
+        </form>
+      </Modal>
     </ContentContainer>
   );
 }
