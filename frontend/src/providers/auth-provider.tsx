@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { authService } from "@/services/auth";
 import { companyService } from "@/services/company";
@@ -22,6 +23,7 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const queryClient = useQueryClient();
 
   React.useEffect(() => {
     const accessToken = tokenStorage.getAccess();
@@ -40,10 +42,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (username: string, password: string, companySlug?: string) => {
       const token = await authService.login(username, password, companySlug);
       tokenStorage.set(token.access_token, token.refresh_token);
+      // Every query key (["stores"], ["products"], ["dashboard"], ...) is
+      // identity-agnostic — with the global staleTime: 0, an uncleared
+      // cache would flash the *previous* session's data on mount before
+      // the fresh fetch resolves. Clearing on every identity transition
+      // (also below) guarantees a logged-in user never sees so much as a
+      // flicker of another account's — or another company's — data.
+      queryClient.clear();
       const me = await authService.me();
       setUser(me);
     },
-    []
+    [queryClient]
   );
 
   const logout = React.useCallback(async () => {
@@ -54,21 +63,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Best-effort: proceed with local logout even if the request fails.
     }
     tokenStorage.clear();
+    queryClient.clear();
     setUser(null);
-  }, []);
+  }, [queryClient]);
 
-  const enterSupportSession = React.useCallback(async (companyId: number) => {
-    const result = await companyService.startSupportSession(companyId);
-    tokenStorage.enterSupportSession(result.access_token);
-    const me = await authService.me();
-    setUser(me);
-  }, []);
+  const enterSupportSession = React.useCallback(
+    async (companyId: number) => {
+      const result = await companyService.startSupportSession(companyId);
+      tokenStorage.enterSupportSession(result.access_token);
+      queryClient.clear();
+      const me = await authService.me();
+      setUser(me);
+    },
+    [queryClient]
+  );
 
   const exitSupportSession = React.useCallback(async () => {
     tokenStorage.exitSupportSession();
+    queryClient.clear();
     const me = await authService.me();
     setUser(me);
-  }, []);
+  }, [queryClient]);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({ user, isAuthenticated: user !== null, isLoading, login, logout, enterSupportSession, exitSupportSession }),
