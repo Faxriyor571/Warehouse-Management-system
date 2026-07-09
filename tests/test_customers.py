@@ -122,6 +122,71 @@ def test_ceo_creates_customer_with_type(client: TestClient, db_session: Session)
     assert resp.json()["customer_type"] == "individual"
 
 
+def test_individual_customer_name_and_phone_are_optional(client: TestClient, db_session: Session) -> None:
+    """Business rule (amended 2026-07-09): an Individual customer must not be
+    forced to have a name or phone on file. The full_name column is still
+    NOT NULL at the DB level — the service generates a placeholder."""
+    ceo = _onboard(client, db_session, "cu-ind")
+    resp = client.post("/api/v1/customers", headers=ceo, json={"customer_type": "individual"})
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["full_name"]  # never blank/null — a placeholder was generated
+    assert body["phone"] is None
+
+
+def test_individual_customer_placeholder_name_uses_phone_if_given(
+    client: TestClient, db_session: Session
+) -> None:
+    ceo = _onboard(client, db_session, "cu-ind-ph")
+    resp = client.post(
+        "/api/v1/customers", headers=ceo, json={"customer_type": "individual", "phone": "+998901234567"}
+    )
+    assert resp.status_code == 201, resp.text
+    assert "+998901234567" in resp.json()["full_name"]
+
+
+def test_individual_customer_explicit_name_is_kept(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "cu-ind-name")
+    resp = client.post(
+        "/api/v1/customers", headers=ceo, json={"customer_type": "individual", "full_name": "Ali Valiyev"}
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["full_name"] == "Ali Valiyev"
+
+
+def test_legal_entity_customer_still_requires_name(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "cu-legal")
+    resp = client.post("/api/v1/customers", headers=ceo, json={"customer_type": "legal_entity"})
+    assert resp.status_code == 422, resp.text
+
+
+def test_sale_works_for_individual_customer_with_no_name(client: TestClient, db_session: Session) -> None:
+    """'Sales must work without forcing those fields' — an Individual
+    customer created with no name/phone must still be usable in a Sale."""
+    ceo = _onboard(client, db_session, "cu-sale")
+    store_id = _store(client, ceo)
+    product_id = _product(client, ceo, "CUSALE")
+    client.post(
+        "/api/v1/stock-in",
+        headers=ceo,
+        json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "10", "price": "10.00"}]},
+    )
+    customer_id = client.post(
+        "/api/v1/customers", headers=ceo, json={"customer_type": "individual"}
+    ).json()["id"]
+
+    resp = client.post(
+        "/api/v1/sales",
+        headers=ceo,
+        json={
+            "store_id": store_id,
+            "customer_id": customer_id,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "15.00"}],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+
+
 def test_seller_can_create_and_list_company_wide(client: TestClient, db_session: Session) -> None:
     ceo = _onboard(client, db_session, "cu-c")
     store_id = _store(client, ceo)

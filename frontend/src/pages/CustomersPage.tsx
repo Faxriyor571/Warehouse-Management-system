@@ -31,15 +31,28 @@ const customerTypeOptions = [
   { label: "Yuridik shaxs", value: "legal_entity" },
 ];
 
-const customerFormSchema = z.object({
-  full_name: z.string().min(2, "F.I.Sh. kamida 2 belgidan iborat bo'lishi kerak"),
-  customer_type: z.enum(["individual", "legal_entity"], { required_error: "Mijoz turini tanlash shart" }),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  passport: z.string().optional(),
-  description: z.string().optional(),
-  is_active: z.boolean(),
-});
+// F.I.Sh. is required for a Legal Entity but optional for an Individual —
+// a walk-in individual buyer isn't forced to have a name on file (backend:
+// customer_service.create_customer generates a placeholder when omitted).
+const customerFormSchema = z
+  .object({
+    full_name: z.string().optional(),
+    customer_type: z.enum(["individual", "legal_entity"], { required_error: "Mijoz turini tanlash shart" }),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    passport: z.string().optional(),
+    description: z.string().optional(),
+    is_active: z.boolean(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.customer_type === "legal_entity" && (!data.full_name || data.full_name.trim().length < 2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["full_name"],
+        message: "F.I.Sh. kamida 2 belgidan iborat bo'lishi kerak",
+      });
+    }
+  });
 type CustomerFormValues = z.infer<typeof customerFormSchema>;
 
 type ModalState = "new" | Customer | null;
@@ -59,6 +72,8 @@ export default function CustomersPage() {
     resolver: zodResolver(customerFormSchema),
     defaultValues: { full_name: "", customer_type: "individual", phone: "", address: "", passport: "", description: "", is_active: true },
   });
+  const watchedCustomerType = form.watch("customer_type");
+  const isIndividual = watchedCustomerType === "individual";
 
   React.useEffect(() => {
     if (modalCustomer && modalCustomer !== "new") {
@@ -209,7 +224,13 @@ export default function CustomersPage() {
       >
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="grid grid-cols-2 gap-4">
-            <FormField htmlFor="customer-name" label="F.I.Sh." required error={form.formState.errors.full_name?.message}>
+            <FormField
+              htmlFor="customer-name"
+              label="F.I.Sh."
+              required={!isIndividual}
+              error={form.formState.errors.full_name?.message}
+              description={isIndividual ? "Jismoniy shaxs uchun ixtiyoriy" : undefined}
+            >
               <Input id="customer-name" invalid={!!form.formState.errors.full_name} {...form.register("full_name")} />
             </FormField>
             <FormField htmlFor="customer-type" label="Mijoz turi" required>

@@ -12,7 +12,8 @@ export interface Customer {
 }
 
 export interface CustomerFormValues {
-  full_name: string;
+  /** Optional for an Individual customer — required for a Legal Entity (enforced by the form's Zod schema). */
+  full_name?: string;
   customer_type: CustomerType;
   phone?: string;
   address?: string;

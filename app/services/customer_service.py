@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.crud.customer import customer as customer_crud
 from app.models.customer import Customer
 from app.models.debt import Debt
-from app.models.enums import AuditAction, DebtStatus
+from app.models.enums import AuditAction, CustomerType, DebtStatus
 from app.models.stock_out import StockOut
 from app.schemas.customer import (
     CustomerCreate,
@@ -34,12 +34,28 @@ def create_customer(
     user_agent: str | None = None,
 ) -> Customer:
     """Create a customer. ``customer_type`` is required for a tenant actor
-    (company_id is not None); the legacy single-tenant flow may omit it."""
+    (company_id is not None); the legacy single-tenant flow may omit it.
+
+    ``full_name`` is required for a Legal Entity (and the legacy, type-less
+    flow) but optional for an Individual — a walk-in individual buyer gets a
+    generated placeholder rather than being forced to have a name on file.
+    The ``full_name`` column itself stays ``NOT NULL``; only the caller's
+    requirement to supply one is conditional.
+    """
     if company_id is not None and data.customer_type is None:
         raise ValidationError("customer_type majburiy (individual yoki legal_entity)")
 
+    full_name = data.full_name.strip() if data.full_name else ""
+    if data.customer_type == CustomerType.INDIVIDUAL:
+        if not full_name:
+            full_name = f"Jismoniy shaxs ({data.phone})" if data.phone else "Jismoniy shaxs"
+    else:
+        if len(full_name) < 2:
+            raise ValidationError("F.I.Sh. kamida 2 belgidan iborat bo'lishi kerak")
+
     payload = data.model_dump()
     payload["company_id"] = company_id
+    payload["full_name"] = full_name
     obj = customer_crud.create(db, payload)
 
     audit_service.log_action(

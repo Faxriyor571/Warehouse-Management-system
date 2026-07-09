@@ -4,7 +4,7 @@ import type { PaginatedResponse } from "@/types/common";
 
 function toPayload(values: CustomerFormValues) {
   return {
-    full_name: values.full_name,
+    full_name: values.full_name || null,
     customer_type: values.customer_type,
     phone: values.phone || null,
     address: values.address || null,
