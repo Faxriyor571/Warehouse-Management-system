@@ -9,9 +9,11 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.auth import security
+from app.auth.support_session import ActingUser
+from app.crud.company import company as company_crud
 from app.crud.user import user as user_crud
 from app.database import get_db
-from app.models.enums import UserRole
+from app.models.enums import CompanyStatus, UserRole
 from app.models.user import User
 from app.utils.exceptions import AuthenticationError, PermissionDeniedError
 
@@ -39,6 +41,20 @@ def get_current_user(
     user = user_crud.get(db, int(subject))
     if user is None:
         raise AuthenticationError("Foydalanuvchi topilmadi")
+
+    # A System Owner support session (see app.auth.support_session) carries
+    # this claim. Re-verify the real user is actually a Super Admin against
+    # the DB on every request — never trust the claim alone — before
+    # resolving to the CEO-equivalent ActingUser every router/service reads.
+    support_company_id = payload.get("support_company_id")
+    if support_company_id is not None:
+        if user.role != UserRole.SUPER_ADMIN:
+            raise AuthenticationError("Seans yaroqsiz")
+        company = company_crud.get(db, support_company_id)
+        if company is None or company.status != CompanyStatus.ACTIVE:
+            raise AuthenticationError("Kompaniya topilmadi yoki faol emas")
+        return ActingUser(user, company=company)  # type: ignore[return-value]
+
     return user
 
 

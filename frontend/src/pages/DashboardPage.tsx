@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Area,
@@ -9,14 +10,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { DollarSign, Receipt, ShoppingCart, Users } from "lucide-react";
+import { Building2, DollarSign, LogIn, PlusCircle, Receipt, ShoppingCart, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
+import { getErrorMessage } from "@/lib/http";
+import { useAuth } from "@/providers/auth-provider";
+import { companyService } from "@/services/company";
 import { dashboardService } from "@/services/dashboard";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
@@ -26,6 +32,14 @@ import { ErrorState } from "@/components/feedback/error-state";
 const CURRENCY = "UZS";
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  // The System Owner has no financial/warehouse data of their own (SRS
+  // §3.1) — their dashboard is the platform view, not the tenant one.
+  if (user?.role === "super_admin") return <PlatformDashboard />;
+  return <TenantDashboard />;
+}
+
+function TenantDashboard() {
   const query = useQuery({ queryKey: ["dashboard"], queryFn: dashboardService.getStats });
   const stats = query.data;
 
@@ -234,6 +248,121 @@ export default function DashboardPage() {
                           <TableCell className="text-muted-foreground">{formatDateTime(op.date)}</TableCell>
                           <TableCell className="text-right tabular-nums font-medium">
                             {formatCurrency(op.amount, CURRENCY)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </ContentContainer>
+  );
+}
+
+function PlatformDashboard() {
+  const navigate = useNavigate();
+  const { enterSupportSession } = useAuth();
+  const [enteringId, setEnteringId] = React.useState<number | null>(null);
+
+  const query = useQuery({ queryKey: ["companies", "platform-dashboard"], queryFn: () => companyService.list({ page_size: 100 }) });
+  const companies = query.data?.items ?? [];
+  const activeCount = companies.filter((c) => c.status === "active").length;
+  const suspendedCount = companies.filter((c) => c.status === "suspended").length;
+  const recent = [...companies].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
+
+  const onEnter = async (companyId: number) => {
+    setEnteringId(companyId);
+    try {
+      await enterSupportSession(companyId);
+      navigate("/", { replace: true });
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setEnteringId(null);
+    }
+  };
+
+  return (
+    <ContentContainer>
+      <PageHeader
+        title="Boshqaruv paneli"
+        description="Platformadagi barcha kompaniyalar bo'yicha umumiy ko'rinish."
+        actions={
+          <Button onClick={() => navigate("/companies")}>
+            <PlusCircle />
+            Kompaniyalarni boshqarish
+          </Button>
+        }
+      />
+
+      {query.isError ? (
+        <ErrorState error={query.error} className="mt-6" onRetry={() => void query.refetch()} />
+      ) : (
+        <>
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {query.isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
+            ) : (
+              <>
+                <StatCard label="Jami kompaniyalar" icon={Building2} tone="primary" value={formatNumber(companies.length)} />
+                <StatCard label="Faol" icon={Building2} tone="success" value={formatNumber(activeCount)} />
+                <StatCard label="Faolsizlantirilgan" icon={Building2} tone="warning" value={formatNumber(suspendedCount)} />
+              </>
+            )}
+          </div>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>So'nggi qo'shilgan kompaniyalar</CardTitle>
+              <CardDescription>Oxirgi onboarding faoliyati</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {query.isLoading ? (
+                <Skeleton className="m-6 h-48" />
+              ) : recent.length === 0 ? (
+                <EmptyState
+                  compact
+                  title="Hozircha kompaniyalar yo'q"
+                  action={<Button size="sm" onClick={() => navigate("/companies")}>Yangi kompaniya</Button>}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Nomi</TableHead>
+                        <TableHead>Identifikator</TableHead>
+                        <TableHead>Yaratilgan</TableHead>
+                        <TableHead>Holati</TableHead>
+                        <TableHead className="text-right" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recent.map((company) => (
+                        <TableRow key={company.id}>
+                          <TableCell className="font-medium">{company.name}</TableCell>
+                          <TableCell className="text-muted-foreground">{company.slug}</TableCell>
+                          <TableCell className="text-muted-foreground">{formatDate(company.created_at)}</TableCell>
+                          <TableCell>
+                            <Badge variant={company.status === "active" ? "success" : "secondary"} dot>
+                              {company.status === "active" ? "Faol" : "Faolsizlantirilgan"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={company.status !== "active"}
+                              loading={enteringId === company.id}
+                              onClick={() => void onEnter(company.id)}
+                            >
+                              <LogIn className="size-3.5" />
+                              Kirish
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}

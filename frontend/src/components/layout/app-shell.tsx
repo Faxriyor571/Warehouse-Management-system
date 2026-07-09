@@ -5,6 +5,7 @@ import { Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navSections } from "@/config/navigation";
 import { useAuth } from "@/providers/auth-provider";
+import { SupportSessionBanner } from "./support-session-banner";
 import { Topbar } from "./topbar";
 
 export function AppShell() {
@@ -15,7 +16,11 @@ export function AppShell() {
   const visibleSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.roles || item.roles.includes(user?.role ?? null)),
+      items: section.items.filter((item) =>
+        user?.role === "super_admin"
+          ? (item.roles?.includes("super_admin") ?? false)
+          : !item.roles || item.roles.includes(user?.role ?? null)
+      ),
     }))
     .filter((section) => section.items.length > 0);
 
@@ -93,6 +98,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-col">
+        <SupportSessionBanner />
         <Topbar onMenuClick={() => setMobileNavOpen((v) => !v)} />
         <main className="flex-1 overflow-y-auto">
           <Outlet />

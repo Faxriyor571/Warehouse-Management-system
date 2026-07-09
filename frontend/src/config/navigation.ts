@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Boxes,
+  Building2,
   CreditCard,
   Download,
   LayoutDashboard,
@@ -23,7 +24,13 @@ export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
-  /** Omit to show to everyone (including the legacy admin, role === null). */
+  /**
+   * Omit to show to every *tenant* identity (CEO, Seller, and the legacy
+   * admin, role === null) — never to the System Owner (role === "super_admin"),
+   * who operates above all companies and has no access to any tenant's
+   * business data outside a support session (SRS §3.1). System-Owner-only
+   * items must opt in explicitly with `roles: ["super_admin"]`.
+   */
   roles?: Array<UserRole | null>;
 }
 
@@ -37,6 +44,12 @@ export const navSections: NavSection[] = [
   {
     id: "main",
     items: [{ id: "dashboard", title: "Boshqaruv paneli", href: "/", icon: LayoutDashboard }],
+  },
+  {
+    id: "platform",
+    label: "PLATFORMA",
+    // System Owner only — platform-level tenant management, above every company.
+    items: [{ id: "companies", title: "Kompaniyalar", href: "/companies", icon: Building2, roles: ["super_admin"] }],
   },
   {
     id: "company",

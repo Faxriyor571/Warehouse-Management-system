@@ -14,6 +14,10 @@ export interface User {
   store_id: number | null;
   last_login_at: string | null;
   created_at: string;
+  /** Set only while a System Owner is in a support session (viewing as a company's CEO). */
+  is_support_session: boolean;
+  support_company_id: number | null;
+  support_company_name: string | null;
 }
 
 export interface Token {

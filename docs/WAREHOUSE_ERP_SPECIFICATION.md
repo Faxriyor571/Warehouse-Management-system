@@ -48,7 +48,13 @@ is fully settled.
 
 The platform serves four distinct classes of user:
 
-- **Super Admin** — the platform operator who onboards and manages companies.
+- **System Owner** (platform role: `super_admin`) — the owner/operator of the
+  ERP platform itself. Exists above every company; not a tenant user. Onboards
+  companies and their CEOs, and — amended 2026-07-09, superseding the original
+  "management only" restriction below — can reach every store, employee,
+  report, dashboard, setting, inventory record, sale, debt, and expense in any
+  company, for platform administration, customer support, troubleshooting,
+  and QA. See §2.2 and §3.1.
 - **Company (tenant)** — an individual distribution business subscribing to the
   platform.
 - **CEO** — the owner/top manager inside a company, with visibility across all of
@@ -89,19 +95,45 @@ which one company can read or write another company's records.
 The tenancy hierarchy is:
 
 ```
-Super Admin  (platform level)
+System Owner  (platform level)
    └── Company  (tenant)
           └── CEO  (company owner)
                  └── Seller  (store-level operator)
                         └── Store  (physical location the seller is assigned to)
 ```
 
-### 2.2 Super Admin
+### 2.2 System Owner (Super Admin)
 
-The Super Admin operates at the platform level, above any individual company.
-The Super Admin is responsible for onboarding companies and managing their
-lifecycle on the platform. The Super Admin does not participate in the
-day-to-day warehouse operations of any company.
+> **Amended 2026-07-09.** This section previously restricted the Super Admin
+> to platform management only, with no access to any company's business data.
+> That restriction is superseded by explicit product decision: the System
+> Owner requires full operational access to every company for platform
+> administration, customer support, troubleshooting, and QA. The role name in
+> code and the database (`super_admin`) is unchanged — "System Owner" is the
+> product-facing name for the same role.
+
+The System Owner operates at the platform level, above every individual
+company, and is **not a tenant user** — it belongs to no company
+(`company_id IS NULL`, unconditionally). The System Owner:
+
+- Creates companies and their first CEO account.
+- Manages the lifecycle of companies (activation status).
+- Can access every company, every store, every employee, every report, every
+  dashboard, every setting, every inventory record, every sale, every debt,
+  and every expense, across the entire platform.
+
+That access is implemented as an explicit, deliberate **support session**: the
+System Owner opens a session scoped as the CEO-equivalent of one company at a
+time (`POST /companies/{id}/support-session`), rather than every module
+silently trusting a blanket "is platform admin" flag. A CEO already has full
+access to everything within their company, so this satisfies the requirement
+exactly, through the same, already-correct CEO-scoped code path every module
+uses. The session is short-lived (expires with the normal access-token TTL,
+no refresh token), and every action taken during it is attributed in the
+audit log to the real System Owner, not a fabricated identity. The System
+Owner's own identity (outside of a support session) has no route into any
+company's operational data — only the Companies module (§4.1) and the support
+session mechanism itself.
 
 ### 2.3 Company
 
@@ -135,18 +167,26 @@ The platform uses **Role-Based Access Control (RBAC)**. Each user is assigned a
 role, and each role grants a defined set of capabilities. Access is further
 constrained by tenancy (company isolation) and, for sellers, by store assignment.
 
-| Role         | Scope                              | Can access other companies | Can access all stores in own company | Financial visibility |
-|--------------|------------------------------------|----------------------------|---------------------------------------|-----------------------|
-| Super Admin  | Platform (all companies)           | Yes (management only)      | N/A                                   | Platform management   |
-| CEO          | Entire own company                 | No                         | Yes                                   | All own-company stores |
-| Seller       | Single assigned store              | No                         | No (inventory quantities only)        | Own store only        |
+| Role             | Scope                              | Can access other companies | Can access all stores in own company | Financial visibility |
+|------------------|-------------------------------------|----------------------------|---------------------------------------|-----------------------|
+| System Owner     | Platform (every company)           | Yes (full, via support session — amended 2026-07-09) | N/A (belongs to no company) | Full, any company (via support session) |
+| CEO              | Entire own company                 | No                         | Yes                                   | All own-company stores |
+| Seller           | Single assigned store              | No                         | No (inventory quantities only)        | Own store only        |
 
-### 3.1 Super Admin permissions
+### 3.1 System Owner permissions
 
-- Onboard and manage companies on the platform.
+*Amended 2026-07-09 — see §2.2 for the full rationale and mechanism.*
+
+- Onboard companies and create their first CEO account.
 - Manage the lifecycle of companies (activation status).
-- No access to the internal business data of any company beyond what is required
-  for platform administration.
+- Open a support session into any company, scoped as that company's CEO —
+  granting full access to its stores, employees, catalogue, customers, stock
+  in, sales, debts, expenses, inventory, dashboard, reports, and settings, for
+  platform administration, customer support, troubleshooting, and QA.
+- Every support-session action is audit-logged under the System Owner's real
+  identity.
+- Has no standing access to any company's business data outside of an
+  actively open support session.
 
 ### 3.2 CEO permissions
 
@@ -337,7 +377,8 @@ current committed scope.
 ### 4.11 Settings
 
 - **Purpose:** Manage company- and user-level configuration.
-- **Users:** Super Admin (platform/company lifecycle), CEO (company settings).
+- **Users:** System Owner (platform/company lifecycle, and any company's
+  settings via a support session — §2.2), CEO (own company settings).
 - **Business rules:**
   - Company settings are isolated per tenant.
   - Configuration options must respect the platform's tenancy and role model.

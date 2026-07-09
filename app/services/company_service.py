@@ -10,11 +10,12 @@ from app.auth import security
 from app.crud.company import company as company_crud
 from app.crud.payment_method import payment_method as pm_crud
 from app.models.company import Company
-from app.models.enums import CompanyStatus, UserRole
+from app.models.enums import AuditAction, CompanyStatus, UserRole
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.schemas.company import CompanyCreate, CompanyUpdate
-from app.utils.exceptions import ConflictError
+from app.services import audit_service
+from app.utils.exceptions import ConflictError, ValidationError
 
 
 def create_company(db: Session, data: CompanyCreate) -> tuple[Company, User]:
@@ -103,3 +104,45 @@ def suspend_company(db: Session, company: Company) -> Company:
     db.commit()
 
     return company
+
+
+def start_support_session(db: Session, super_admin: User, company_id: int) -> tuple[Company, str]:
+    """Issue a support-session access token for a System Owner (SRS §3.1, amended).
+
+    Scoped as the CEO of ``company_id`` — a CEO already has full access to
+    every store, employee, report, dashboard, setting, inventory, sale, debt,
+    and expense in their company, so this is sufficient for platform
+    administration, customer support, troubleshooting, and QA without
+    duplicating that access across every router's permission gate. See
+    app.auth.support_session.ActingUser for how the token is resolved back
+    into a request identity.
+
+    Deliberately access-token-only, no refresh token: ``auth_service.
+    refresh_tokens()`` always re-derives its claims from the caller's own
+    ``User`` row (role/company_id/store_id), so a refreshed support-session
+    token would silently drop back to the System Owner's real, unscoped
+    identity anyway. A support session is meant to be short and explicit —
+    it expires with the normal access-token TTL and must be re-opened.
+    """
+    company = company_crud.get_or_404(db, company_id)
+    if company.status != CompanyStatus.ACTIVE:
+        raise ValidationError("Faqat faol kompaniyaga kirish mumkin")
+
+    access_token = security.create_access_token(
+        super_admin.id,
+        role=super_admin.role.value if super_admin.role else None,
+        company_id=None,
+        store_id=None,
+        support_company_id=company.id,
+    )
+
+    audit_service.log_action(
+        db,
+        action=AuditAction.LOGIN,
+        user_id=super_admin.id,
+        entity_type="company",
+        entity_id=company.id,
+        description=f"System Owner {super_admin.username} support session boshladi: {company.name}",
+    )
+
+    return company, access_token

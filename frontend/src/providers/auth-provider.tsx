@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { authService } from "@/services/auth";
+import { companyService } from "@/services/company";
 import { tokenStorage } from "@/lib/token-storage";
 import type { User } from "@/types/auth";
 
@@ -10,6 +11,10 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (username: string, password: string, companySlug?: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** System Owner only: enter a support session, viewing a company as its CEO. */
+  enterSupportSession: (companyId: number) => Promise<void>;
+  /** Return to the System Owner's own session from an active support session. */
+  exitSupportSession: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -52,9 +57,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const enterSupportSession = React.useCallback(async (companyId: number) => {
+    const result = await companyService.startSupportSession(companyId);
+    tokenStorage.enterSupportSession(result.access_token);
+    const me = await authService.me();
+    setUser(me);
+  }, []);
+
+  const exitSupportSession = React.useCallback(async () => {
+    tokenStorage.exitSupportSession();
+    const me = await authService.me();
+    setUser(me);
+  }, []);
+
   const value = React.useMemo<AuthContextValue>(
-    () => ({ user, isAuthenticated: user !== null, isLoading, login, logout }),
-    [user, isLoading, login, logout]
+    () => ({ user, isAuthenticated: user !== null, isLoading, login, logout, enterSupportSession, exitSupportSession }),
+    [user, isLoading, login, logout, enterSupportSession, exitSupportSession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

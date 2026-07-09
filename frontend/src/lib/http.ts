@@ -50,8 +50,16 @@ http.interceptors.response.use(
       config.headers.Authorization = `Bearer ${token.access_token}`;
       return http(config);
     } catch (refreshError) {
-      tokenStorage.clear();
-      window.location.href = "/login";
+      // A support session has no refresh token by design (see
+      // token-storage.ts) — its expiry lands here. Fall back to the
+      // stashed System Owner session instead of a hard logout.
+      if (tokenStorage.hasOwnerSession()) {
+        tokenStorage.exitSupportSession();
+        window.location.href = "/companies";
+      } else {
+        tokenStorage.clear();
+        window.location.href = "/login";
+      }
       throw refreshError;
     } finally {
       refreshPromise = null;

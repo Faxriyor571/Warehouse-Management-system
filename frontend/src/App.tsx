@@ -11,6 +11,7 @@ import { AuthProvider } from "@/providers/auth-provider";
 import LoginPage from "@/pages/LoginPage";
 
 const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
+const CompaniesPage = lazy(() => import("@/pages/CompaniesPage"));
 const CustomersPage = lazy(() => import("@/pages/CustomersPage"));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
 const DebtDetailPage = lazy(() => import("@/pages/DebtDetailPage"));
@@ -63,6 +64,7 @@ export default function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<DashboardPage />} />
+                  <Route path="/companies" element={<CompaniesPage />} />
                   <Route path="/stores" element={<StoresPage />} />
                   <Route path="/employees" element={<EmployeesPage />} />
                   <Route path="/products" element={<ProductsPage />} />

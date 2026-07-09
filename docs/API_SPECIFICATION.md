@@ -150,9 +150,11 @@ Access: Super Admin, CEO, Seller — Seller: self · CEO: self · Super Admin: s
 **Purpose:** Onboard and manage the lifecycle of companies (tenants) on the
 platform ([SRS §2.2](WAREHOUSE_ERP_SPECIFICATION.md), §4.11).
 
-**Roles allowed:** Super Admin only, per SRS §3.1 ("no access to the internal
-business data of any company beyond what is required for platform
-administration"). CEO and Seller have no access to this module.
+**Roles allowed:** Super Admin only. CEO and Seller have no access to this
+module. Cross-company operational access (stores, employees, reports, etc.)
+is granted separately, through the support-session mechanism at the bottom
+of this section — see [SRS §2.2](WAREHOUSE_ERP_SPECIFICATION.md#22-system-owner-super-admin)
+(amended 2026-07-09).
 
 ### `POST /companies`
 
@@ -213,6 +215,39 @@ Access: Super Admin only
   company's users on suspend, so already-issued access tokens expire naturally
   and refresh is blocked.
 
+### `POST /companies/{id}/support-session`
+
+Access: Super Admin only — Seller: no access · CEO: no access · Super Admin: full
+
+*Added 2026-07-09 — the mechanism behind the System Owner's cross-company
+access described in [SRS §2.2](WAREHOUSE_ERP_SPECIFICATION.md#22-system-owner-super-admin).*
+
+- **Response:**
+  ```
+  { "access_token": "string", "token_type": "bearer",
+    "company": { "id", "name", "slug", "status", "contact_email", "contact_phone", "created_at", "updated_at" } }
+  ```
+  Deliberately **access-token-only** — no `refresh_token`. A support session
+  is short-lived by design (expires with the normal access-token TTL) and
+  must be explicitly re-opened; it is never silently extended.
+- **Business rules:** issues a token that resolves (server-side, per request)
+  to a CEO-equivalent identity scoped to `company_id = {id}`, `store_id =
+  null` — the same access shape as that company's own CEO, which already
+  covers every store, employee, report, dashboard, setting, inventory
+  record, sale, debt, and expense in the company. The token's subject
+  remains the System Owner's real user id, so every action taken during the
+  session is audit-logged under their real identity, not a fabricated one
+  (`GET /audit-log`, entity/description reflect the real actor).
+  `GET /auth/me` while a support session is active returns
+  `is_support_session: true`, `support_company_id`, and
+  `support_company_name` so the caller can render an "acting as" indicator.
+- **Errors:** `404` unknown company; `422` company is not `active`
+  (suspended companies cannot be entered); `403` caller is not a System
+  Owner.
+- **Notes:** there is no corresponding "exit" endpoint — the client simply
+  discards the support-session access token and resumes its own System
+  Owner session token, which it must have retained separately.
+
 ---
 
 ## 3. Stores
@@ -221,7 +256,7 @@ Access: Super Admin only
 
 ### `POST /stores`
 
-Access: CEO only — Seller: no access · CEO: full (own company) · Super Admin: no access (SRS §3.1)
+Access: CEO only — Seller: no access · CEO: full (own company) · Super Admin: full, via support session (§2.2, amended) (SRS §3.1)
 
 - **Request:** `{ "name": "string", "address": "string|null", "phone": "string|null" }`
 - **Response:** created store (`company_id` from token, never client-supplied).
@@ -231,7 +266,7 @@ Access: CEO only — Seller: no access · CEO: full (own company) · Super Admin
 ### `GET /stores`
 
 Access: CEO, Seller — Seller: sees all company stores' **names only** (for
-cross-store inventory browsing, §7) · CEO: full detail, all stores · Super Admin: no access
+cross-store inventory browsing, §7) · CEO: full detail, all stores · Super Admin: full, via support session (§2.2, amended)
 
 - **Response for CEO:** full store list including `is_active`.
 - **Response for Seller:** reduced shape `{ "id", "name" }` only — no address,
@@ -241,7 +276,7 @@ cross-store inventory browsing, §7) · CEO: full detail, all stores · Super Ad
 
 ### `GET /stores/{id}`
 
-Access: CEO (any store in own company), Seller (**own assigned store only**) — Super Admin: no access
+Access: CEO (any store in own company), Seller (**own assigned store only**) — Super Admin: full, via support session (§2.2, amended)
 
 - **Errors:** `403` if a Seller requests a store other than their own
   `store_id` claim.
@@ -268,7 +303,7 @@ defines no multi-CEO capability.
 
 ### `POST /employees`
 
-Access: CEO only — Seller: no access · CEO: full (own company) · Super Admin: no access
+Access: CEO only — Seller: no access · CEO: full (own company) · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -329,7 +364,7 @@ Access: CEO only
 
 ### `POST /categories` / `PUT /categories/{id}` / `DELETE /categories/{id}`
 
-Access: CEO only — Seller: no write access · CEO: full (own company) · Super Admin: no access
+Access: CEO only — Seller: no write access · CEO: full (own company) · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:** `{ "name": "string" }`
 - **Validation:** `name` unique within the company
@@ -341,7 +376,7 @@ Access: CEO only — Seller: no write access · CEO: full (own company) · Super
 
 ### `GET /categories` / `GET /categories/{id}`
 
-Access: CEO, Seller — Seller: read-only, own company · CEO: full, own company · Super Admin: no access
+Access: CEO, Seller — Seller: read-only, own company · CEO: full, own company · Super Admin: full, via support session (§2.2, amended)
 
 - **Response:** paginated list / single category, excluding soft-deleted rows.
 
@@ -353,7 +388,7 @@ Access: CEO, Seller — Seller: read-only, own company · CEO: full, own company
 
 ### `POST /products`
 
-Access: CEO only — Seller: no write access · CEO: full (own company) · Super Admin: no access
+Access: CEO only — Seller: no write access · CEO: full (own company) · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -378,7 +413,7 @@ Access: CEO only — Seller: no write access · CEO: full (own company) · Super
 
 Access: CEO, Seller — Seller: read-only, own company (quantity shown for own
 store; see [§7 Inventory](#7-inventory) for cross-store) · CEO: full, own
-company · Super Admin: no access
+company · Super Admin: full, via support session (§2.2, amended)
 
 - **Query (list):** `page`, `page_size`, `search`, `category_id`.
 - **Response:** product fields plus **the caller's own-store quantity**
@@ -415,7 +450,7 @@ ever mutated as a side effect of [Stock In](#8-stock-in),
 ### `GET /inventory/store-stock`
 
 Access: CEO, Seller — Seller: **own store only** · CEO: any store in own
-company (via `store_id` query param) or company-wide totals · Super Admin: no access
+company (via `store_id` query param) or company-wide totals · Super Admin: full, via support session (§2.2, amended)
 
 - **Query:** `store_id` (CEO only — required for Seller's own store
   implicitly), `page`, `page_size`, `search` (product name/SKU).
@@ -426,7 +461,7 @@ company (via `store_id` query param) or company-wide totals · Super Admin: no a
 
 ### `GET /inventory/store-stock/cross-store`
 
-Access: CEO, Seller — Seller: **quantity-only, all company stores** · CEO: same, though redundant with §7's CEO company-wide view · Super Admin: no access
+Access: CEO, Seller — Seller: **quantity-only, all company stores** · CEO: same, though redundant with §7's CEO company-wide view · Super Admin: full, via support session (§2.2, amended)
 
 - **Query:** `product_id` (required).
 - **Response:** `{ "store_id", "store_name", "quantity" }[]` — one row per
@@ -442,7 +477,7 @@ Access: CEO, Seller — Seller: **quantity-only, all company stores** · CEO: sa
 
 ### `GET /inventory/movements`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Query:** `store_id`, `product_id`, `movement_type`
   (`stock_in`|`sale`|`sales_return`), `date_from`, `date_to`, `page`, `page_size`.
@@ -463,7 +498,7 @@ Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide 
 
 Access: CEO, Seller — Seller: **own store only** (`store_id` implied from
 token, not accepted in the request body) · CEO: any store in own company
-(`store_id` required in body) · Super Admin: no access
+(`store_id` required in body) · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -491,7 +526,7 @@ token, not accepted in the request body) · CEO: any store in own company
 
 ### `GET /stock-in` / `GET /stock-in/{id}`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Query (list):** `store_id` (CEO only), `supplier_id`, `date_from`,
   `date_to`, `search` (reference), `page`, `page_size`.
@@ -508,7 +543,7 @@ module.
 ### `POST /sales`
 
 Access: CEO, Seller — Seller: **own store only** (`store_id` implied from
-token) · CEO: any store in own company (`store_id` required in body) · Super Admin: no access
+token) · CEO: any store in own company (`store_id` required in body) · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -558,7 +593,7 @@ token) · CEO: any store in own company (`store_id` required in body) · Super A
 
 ### `GET /sales` / `GET /sales/{id}`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Query (list):** `store_id` (CEO only), `customer_id`, `payment_status`,
   `date_from`, `date_to`, `search` (reference), `page`, `page_size`.
@@ -567,7 +602,7 @@ Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide 
 ### `POST /sales/{id}/returns`
 
 Access: CEO, Seller — Seller: own store only (must match the original sale's
-store) · CEO: any store in own company · Super Admin: no access
+store) · CEO: any store in own company · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -617,7 +652,7 @@ financial history** (sales, debts) is store-filtered for a Seller.
 
 ### `POST /customers`
 
-Access: CEO, Seller — Seller: create only, company-wide · CEO: full · Super Admin: no access
+Access: CEO, Seller — Seller: create only, company-wide · CEO: full · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -635,7 +670,7 @@ Access: CEO, Seller — Seller: create only, company-wide · CEO: full · Super 
 
 Access: CEO, Seller — Seller: company-wide customer list, **but debt/sales
 history in the detail view is filtered to the Seller's own store** · CEO: full,
-all stores' history · Super Admin: no access
+all stores' history · Super Admin: full, via support session (§2.2, amended)
 
 - **Query (list):** `page`, `page_size`, `search` (name/phone), `customer_type`.
 - **Response (detail):** customer fields plus a debt summary
@@ -666,7 +701,7 @@ reminders (SRS §4.8, rules #7, #20, #21, #22).
 
 ### `GET /debts` / `GET /debts/{id}`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Query (list):** `store_id` (CEO only), `customer_id`, `status`
   (`active`|`paid`|`overdue`), `due_before`, `due_after`, `page`, `page_size`.
@@ -682,7 +717,7 @@ Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide 
 
 ### `POST /debts/{id}/payments`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store in own company · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store in own company · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:** `{ "payment_method_id": 2, "amount": "5000.00", "note": "string|null" }`
 - **Response:** updated `debt` (`paid_amount`, `remaining_amount`, `status`)
@@ -729,7 +764,7 @@ Access: CEO, Seller — Seller: own store only · CEO: any store in own company 
 
 Access: CEO, Seller — Seller: **own store auto-assigned** (`store_id` not
 accepted in the request body — SRS rule #12) · CEO: any store in own company
-(`store_id` required in body) · Super Admin: no access
+(`store_id` required in body) · Super Admin: full, via support session (§2.2, amended)
 
 - **Request:**
   ```
@@ -750,7 +785,7 @@ accepted in the request body — SRS rule #12) · CEO: any store in own company
 
 ### `GET /expenses` / `GET /expenses/{id}`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Query (list):** `store_id` (CEO only), `expense_type`, `date_from`,
   `date_to`, `page`, `page_size`.
@@ -767,7 +802,7 @@ Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide 
 
 ### `GET /dashboard`
 
-Access: CEO, Seller — Seller: **own store scope** · CEO: **company-wide, all stores** · Super Admin: no access
+Access: CEO, Seller — Seller: **own store scope** · CEO: **company-wide, all stores** · Super Admin: full, via support session (§2.2, amended)
 
 - **Response (shape shared, data scope differs by role):**
   ```
@@ -798,7 +833,7 @@ Access: CEO, Seller — Seller: **own store scope** · CEO: **company-wide, all 
 
 ### `GET /reports/sales`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Query:** `store_id` (CEO only), `date_from`, `date_to`.
 - **Response:** aggregated totals (`total_revenue`, `total_count`,
@@ -807,20 +842,20 @@ Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide 
 ### `GET /reports/inventory`
 
 Access: CEO, Seller — Seller: own store only, or cross-store **quantities**
-only via [§7](#7-inventory) · CEO: any store / company-wide · Super Admin: no access
+only via [§7](#7-inventory) · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Response:** current `store_stock` levels for the resolved scope, by product.
 
 ### `GET /reports/debts`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Response:** outstanding balances grouped by customer and by status
   (`active`/`overdue`).
 
 ### `GET /reports/expenses`
 
-Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: no access
+Access: CEO, Seller — Seller: own store only · CEO: any store / company-wide · Super Admin: full, via support session (§2.2, amended)
 
 - **Response:** totals grouped by `expense_type` and by date.
 

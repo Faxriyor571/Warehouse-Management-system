@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.auth.dependencies import DbSession, require_super_admin
+from app.auth.dependencies import CurrentUser, DbSession, require_super_admin
 from app.crud.company import company as company_crud
 from app.models.company import Company
 from app.models.enums import CompanyStatus
@@ -12,6 +12,7 @@ from app.schemas.company import (
     CompanyCreateResponse,
     CompanyOut,
     CompanyUpdate,
+    SupportSessionToken,
 )
 from app.schemas.common import PaginatedResponse
 from app.services import company_service
@@ -80,3 +81,13 @@ def activate_company(db: DbSession, company_id: int) -> Company:
 def suspend_company(db: DbSession, company_id: int) -> Company:
     company = company_crud.get_or_404(db, company_id)
     return company_service.suspend_company(db, company)
+
+
+@router.post(
+    "/{company_id}/support-session",
+    response_model=SupportSessionToken,
+    summary="Support session boshlash (System Owner ushbu kompaniyaga CEO sifatida kiradi)",
+)
+def start_support_session(db: DbSession, current_user: CurrentUser, company_id: int) -> SupportSessionToken:
+    company, access_token = company_service.start_support_session(db, current_user, company_id)
+    return SupportSessionToken(access_token=access_token, company=company)  # type: ignore[arg-type]

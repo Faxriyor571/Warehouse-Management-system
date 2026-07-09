@@ -77,3 +77,9 @@ class UserOut(UserBase):
     store_id: int | None = None
     last_login_at: datetime | None = None
     created_at: datetime
+    # Set only when this identity is a System Owner's support session (see
+    # app.auth.support_session) — lets the frontend render the "acting as"
+    # banner from the existing GET /auth/me call, no extra request needed.
+    is_support_session: bool = False
+    support_company_id: int | None = None
+    support_company_name: str | None = None

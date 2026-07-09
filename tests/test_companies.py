@@ -199,3 +199,82 @@ def test_legacy_admin_cannot_access_companies(
     """The legacy is_superuser bypass must not grant access to the new module."""
     resp = client.get("/api/v1/companies", headers=auth_headers)
     assert resp.status_code == 403
+
+
+def test_support_session_grants_ceo_equivalent_access(
+    client: TestClient, db_session: Session
+) -> None:
+    """A System Owner's support session must reach every module a CEO can.
+
+    Exercises one representative module per SRS §3.1's amended list (store,
+    dashboard, settings) rather than every single one — the mechanism is
+    role/company_id substitution, not per-module logic, so one is
+    representative of all of them.
+    """
+    headers = _super_admin_headers(client, db_session, username="root-h")
+    created = client.post(
+        "/api/v1/companies", headers=headers, json=_company_payload("comp-h")
+    ).json()
+    company_id = created["company"]["id"]
+
+    session_resp = client.post(
+        f"/api/v1/companies/{company_id}/support-session", headers=headers
+    )
+    assert session_resp.status_code == 200, session_resp.text
+    body = session_resp.json()
+    assert body["company"]["id"] == company_id
+    assert "refresh_token" not in body
+
+    support_headers = {"Authorization": f"Bearer {body['access_token']}"}
+
+    me = client.get("/api/v1/auth/me", headers=support_headers)
+    assert me.status_code == 200
+    me_body = me.json()
+    assert me_body["role"] == "ceo"
+    assert me_body["company_id"] == company_id
+    assert me_body["is_support_session"] is True
+    assert me_body["support_company_name"] == created["company"]["name"]
+
+    store_resp = client.post(
+        "/api/v1/stores", headers=support_headers, json={"name": "Support Store"}
+    )
+    assert store_resp.status_code == 201, store_resp.text
+    assert store_resp.json()["name"] == "Support Store"
+
+    settings_resp = client.get("/api/v1/settings", headers=support_headers)
+    assert settings_resp.status_code == 200
+
+    dashboard_resp = client.get("/api/v1/dashboard", headers=support_headers)
+    assert dashboard_resp.status_code == 200
+    assert dashboard_resp.json()["scope"] == "company"
+
+
+def test_support_session_requires_super_admin(client: TestClient, db_session: Session) -> None:
+    headers = _super_admin_headers(client, db_session, username="root-i")
+    created = client.post(
+        "/api/v1/companies", headers=headers, json=_company_payload("comp-i")
+    ).json()
+    company_id = created["company"]["id"]
+
+    ceo_login = client.post(
+        "/api/v1/auth/login",
+        data={"username": "ceo-comp-i", "password": "Ceo12345!", "company_slug": "comp-i"},
+    ).json()
+    ceo_headers = {"Authorization": f"Bearer {ceo_login['access_token']}"}
+
+    resp = client.post(f"/api/v1/companies/{company_id}/support-session", headers=ceo_headers)
+    assert resp.status_code == 403
+
+
+def test_support_session_blocked_for_suspended_company(
+    client: TestClient, db_session: Session
+) -> None:
+    headers = _super_admin_headers(client, db_session, username="root-j")
+    created = client.post(
+        "/api/v1/companies", headers=headers, json=_company_payload("comp-j")
+    ).json()
+    company_id = created["company"]["id"]
+    client.post(f"/api/v1/companies/{company_id}/suspend", headers=headers)
+
+    resp = client.post(f"/api/v1/companies/{company_id}/support-session", headers=headers)
+    assert resp.status_code == 422

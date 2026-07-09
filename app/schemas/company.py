@@ -66,3 +66,16 @@ class CompanyCreateResponse(BaseModel):
 
     company: CompanyOut
     ceo: CeoSummary
+
+
+class SupportSessionToken(BaseModel):
+    """Response for a System Owner starting a support session into a company.
+
+    Access-token-only, deliberately: see
+    app.services.company_service.start_support_session for why a support
+    session never gets a refresh token.
+    """
+
+    access_token: str
+    token_type: str = "bearer"
+    company: CompanyOut
