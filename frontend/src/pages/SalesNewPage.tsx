@@ -202,24 +202,39 @@ export default function SalesNewPage() {
     onError: toastMutationError,
   });
 
+  // The individual+debt path awaits an inline customer-creation call before
+  // createMutation.mutate() ever runs, so createMutation.isPending alone
+  // leaves a window where the Save button looks idle and clickable — a fast
+  // double-click there would create two customers and two sales. A ref-based
+  // guard is required (not just the isProcessing state below): two clicks
+  // fired synchronously both invoke onSubmit before React commits a
+  // re-render, so both closures would still read a stale isProcessing=false
+  // from state — a ref mutates immediately and is visible to the second
+  // call right away. isProcessing itself only drives the visible loading UI.
+  const isSubmittingRef = React.useRef(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+
   const onSubmit = async (values: SaleFormSchemaValues) => {
+    if (isSubmittingRef.current) return;
     if (isCeo && !values.store_id) {
       form.setError("store_id", { message: "Do'konni tanlash shart" });
       return;
     }
 
-    // Fully paid: no debt owner needed, whatever was left over from a
-    // previous customer-type toggle is discarded.
-    if (remainingDebt <= 0) {
-      createMutation.mutate({ ...values, customer_id: undefined });
-      return;
-    }
+    isSubmittingRef.current = true;
+    setIsProcessing(true);
+    try {
+      // Fully paid: no debt owner needed, whatever was left over from a
+      // previous customer-type toggle is discarded.
+      if (remainingDebt <= 0) {
+        createMutation.mutate({ ...values, customer_id: undefined });
+        return;
+      }
 
-    // A debt will result. An individual debtor doesn't get picked from a
-    // list — they're created inline via the existing customer endpoint,
-    // then attached to the sale.
-    if (values.customer_type === "individual") {
-      try {
+      // A debt will result. An individual debtor doesn't get picked from a
+      // list — they're created inline via the existing customer endpoint,
+      // then attached to the sale.
+      if (values.customer_type === "individual") {
         const customer = await customerService.create({
           full_name: values.debtor_full_name,
           customer_type: "individual",
@@ -227,13 +242,16 @@ export default function SalesNewPage() {
           is_active: true,
         });
         createMutation.mutate({ ...values, customer_id: String(customer.id) });
-      } catch (err) {
-        toastMutationError(err);
+        return;
       }
-      return;
-    }
 
-    createMutation.mutate(values);
+      createMutation.mutate(values);
+    } catch (err) {
+      toastMutationError(err);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -440,7 +458,7 @@ export default function SalesNewPage() {
           <Button type="button" variant="outline" onClick={() => navigate("/sales")}>
             Bekor qilish
           </Button>
-          <Button type="submit" loading={createMutation.isPending}>
+          <Button type="submit" loading={isProcessing || createMutation.isPending}>
             Saqlash
           </Button>
         </div>
