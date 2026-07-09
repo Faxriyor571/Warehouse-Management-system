@@ -11,6 +11,7 @@ from app.models.enums import AuditAction
 from app.models.expense import Expense
 from app.schemas.expense import ExpenseCreate
 from app.services import audit_service
+from app.utils.business_time import business_today
 
 
 def create_expense(
@@ -30,9 +31,12 @@ def create_expense(
         expense_type=data.expense_type,
         amount=data.amount,
         description=data.description,
+        # Business-local (UTC+5) today when not explicitly supplied — the
+        # column's server_default is func.current_date(), which runs in the
+        # DB session's (UTC) timezone and would misdate expenses recorded
+        # between local midnight and 05:00. See app.utils.business_time.
+        date=data.date if data.date is not None else business_today(),
     )
-    if data.date is not None:
-        expense.date = data.date
     db.add(expense)
     db.commit()
     db.refresh(expense)

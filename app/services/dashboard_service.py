@@ -8,7 +8,7 @@ new business logic).
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 
 from sqlalchemy import ColumnElement, func, select
@@ -27,6 +27,7 @@ from app.schemas.dashboard import (
     TopDebtor,
     TopProduct,
 )
+from app.utils.business_time import business_today, local_day_start_utc, to_local_date
 
 _ZERO = Decimal("0")
 
@@ -46,8 +47,17 @@ def _scalar(db: Session, stmt) -> Decimal:
 
 def get_stats(db: Session, *, company_id: int | None, store_id: int | None) -> DashboardStats:
     """Compute all dashboard figures for one company (or one store within it)."""
-    today = datetime.now(timezone.utc).date()
+    # Business-local (UTC+5) calendar day/month — not the server's UTC clock.
+    # See app.utils.business_time for why: comparing sales against a
+    # UTC-midnight boundary attributed anything a UTC+5 shopkeeper recorded
+    # between local midnight and 05:00 to the wrong calendar day. Expressed
+    # as UTC range boundaries (not a SQL-side date()/timezone() truncation)
+    # so it stays portable to the SQLite engine the test suite runs on.
+    today = business_today()
     month_start = today.replace(day=1)
+    today_start = local_day_start_utc(today)
+    today_end = local_day_start_utc(today + timedelta(days=1))
+    month_start_utc = local_day_start_utc(month_start)
 
     so_scope = _scope_filters(StockOut, company_id, store_id)
     si_scope = _scope_filters(StockIn, company_id, store_id)
@@ -58,21 +68,19 @@ def get_stats(db: Session, *, company_id: int | None, store_id: int | None) -> D
     today_sales_total = _scalar(
         db,
         select(func.coalesce(func.sum(StockOut.total_amount), 0)).where(
-            *so_scope, func.date(StockOut.date) == today
+            *so_scope, StockOut.date >= today_start, StockOut.date < today_end
         ),
     )
     today_sales_count = int(
         db.execute(
-            select(func.count(StockOut.id)).where(*so_scope, func.date(StockOut.date) == today)
+            select(func.count(StockOut.id)).where(*so_scope, StockOut.date >= today_start, StockOut.date < today_end)
         ).scalar_one()
     )
 
     # --- Monthly revenue / expenses ---
     month_revenue = _scalar(
         db,
-        select(func.coalesce(func.sum(StockOut.total_amount), 0)).where(
-            *so_scope, func.date(StockOut.date) >= month_start
-        ),
+        select(func.coalesce(func.sum(StockOut.total_amount), 0)).where(*so_scope, StockOut.date >= month_start_utc),
     )
     month_expenses = _scalar(
         db,
@@ -141,13 +149,20 @@ def get_stats(db: Session, *, company_id: int | None, store_id: int | None) -> D
     recent_operations = recent_operations[:10]
 
     # --- Sales chart (last 7 days, scoped) ---
+    # Bucketed in Python (by business-local date) rather than a SQL-side
+    # GROUP BY date() truncation, for the same portability reason as above —
+    # 7 days of a single company/store's sales is a small enough row count
+    # that this costs nothing meaningful.
     seven_days_ago = today - timedelta(days=6)
-    chart_stmt = (
-        select(func.date(StockOut.date).label("d"), func.coalesce(func.sum(StockOut.total_amount), 0).label("total"))
-        .where(*so_scope, func.date(StockOut.date) >= seven_days_ago)
-        .group_by(func.date(StockOut.date))
-    )
-    chart_map: dict[str, Decimal] = {str(row.d): Decimal(row.total) for row in db.execute(chart_stmt).all()}
+    chart_rows = db.execute(
+        select(StockOut.date, StockOut.total_amount).where(
+            *so_scope, StockOut.date >= local_day_start_utc(seven_days_ago)
+        )
+    ).all()
+    chart_map: dict[str, Decimal] = {}
+    for so_dt, amount in chart_rows:
+        key = str(to_local_date(so_dt))
+        chart_map[key] = chart_map.get(key, _ZERO) + Decimal(amount)
     sales_chart = [
         ChartPoint(label=str(d), value=chart_map.get(str(d), _ZERO))
         for d in (seven_days_ago + timedelta(days=i) for i in range(7))
