@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
+import { useAuth } from "@/providers/auth-provider";
 import { paymentMethodService } from "@/services/payment-method";
 import type { PaymentMethod } from "@/types/payment-method";
 import { ContentContainer } from "@/components/layout/content-container";
@@ -51,6 +52,14 @@ type FormValues = z.infer<typeof formSchema>;
 type ModalState = "new" | PaymentMethod | null;
 
 export default function PaymentMethodsPage() {
+  const { user } = useAuth();
+  // Manage (create/update/delete) is CEO-only, or the legacy admin
+  // (role === null) — see require_payment_method_manage in
+  // app/auth/legacy_compat.py. A Seller has read-only access (needed for
+  // the Sales payment picker), so this page is reachable for them via
+  // direct URL/sidebar, but write actions must be hidden, not just
+  // rejected server-side.
+  const canManage = user?.role === "ceo" || user?.role == null;
   const queryClient = useQueryClient();
   const [modalMethod, setModalMethod] = React.useState<ModalState>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<PaymentMethod | null>(null);
@@ -116,10 +125,12 @@ export default function PaymentMethodsPage() {
         title="To'lov turlari"
         description="Savdo va qarz to'lovlarida ishlatiladigan to'lov turlari."
         actions={
-          <Button onClick={() => setModalMethod("new")}>
-            <Plus />
-            Yangi to'lov turi
-          </Button>
+          canManage ? (
+            <Button onClick={() => setModalMethod("new")}>
+              <Plus />
+              Yangi to'lov turi
+            </Button>
+          ) : null
         }
       />
 
@@ -132,7 +143,7 @@ export default function PaymentMethodsPage() {
           <EmptyState
             title="Hozircha to'lov turlari yo'q"
             description="Boshlash uchun birinchi to'lov turingizni qo'shing."
-            action={<Button size="sm" onClick={() => setModalMethod("new")}>Yangi to'lov turi</Button>}
+            action={canManage ? <Button size="sm" onClick={() => setModalMethod("new")}>Yangi to'lov turi</Button> : undefined}
           />
         ) : (
           <Table>
@@ -141,7 +152,7 @@ export default function PaymentMethodsPage() {
                 <TableHead>Nomi</TableHead>
                 <TableHead>Turi</TableHead>
                 <TableHead>Holati</TableHead>
-                <TableHead className="text-right" />
+                {canManage ? <TableHead className="text-right" /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -157,22 +168,24 @@ export default function PaymentMethodsPage() {
                       {method.is_active ? "Faol" : "Nofaol"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1.5">
-                      <Button variant="ghost" size="icon-sm" onClick={() => setModalMethod(method)} aria-label="Tahrirlash">
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={method.is_system}
-                        onClick={() => setDeleteTarget(method)}
-                        aria-label="O'chirish"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManage ? (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setModalMethod(method)} aria-label="Tahrirlash">
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={method.is_system}
+                          onClick={() => setDeleteTarget(method)}
+                          aria-label="O'chirish"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>

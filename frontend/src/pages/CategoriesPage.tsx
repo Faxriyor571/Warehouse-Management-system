@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
+import { useAuth } from "@/providers/auth-provider";
 import { categoryService } from "@/services/category";
 import type { Category } from "@/types/category";
 import { ContentContainer } from "@/components/layout/content-container";
@@ -34,6 +35,12 @@ type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 type ModalState = "new" | Category | null;
 
 export default function CategoriesPage() {
+  const { user } = useAuth();
+  // Manage (create/update/delete) is CEO-only, or the legacy admin
+  // (role === null) — see require_catalogue_manage in
+  // app/auth/legacy_compat.py. A Seller has read-only access, same as
+  // Products.
+  const canManage = user?.role === "ceo" || user?.role == null;
   const queryClient = useQueryClient();
   const [modalCategory, setModalCategory] = React.useState<ModalState>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Category | null>(null);
@@ -97,12 +104,14 @@ export default function CategoriesPage() {
     <ContentContainer>
       <PageHeader
         title="Kategoriyalar"
-        description="Kompaniyangizning mahsulot kategoriyalarini boshqaring."
+        description={canManage ? "Kompaniyangizning mahsulot kategoriyalarini boshqaring." : "Kompaniyangiz mahsulot kategoriyalari."}
         actions={
-          <Button onClick={() => setModalCategory("new")}>
-            <Plus />
-            Yangi kategoriya
-          </Button>
+          canManage ? (
+            <Button onClick={() => setModalCategory("new")}>
+              <Plus />
+              Yangi kategoriya
+            </Button>
+          ) : null
         }
       />
 
@@ -114,8 +123,8 @@ export default function CategoriesPage() {
         ) : categories.length === 0 ? (
           <EmptyState
             title="Hozircha kategoriyalar yo'q"
-            description="Boshlash uchun birinchi kategoriyangizni yarating."
-            action={<Button size="sm" onClick={() => setModalCategory("new")}>Yangi kategoriya</Button>}
+            description={canManage ? "Boshlash uchun birinchi kategoriyangizni yarating." : "Kategoriyalar topilmadi."}
+            action={canManage ? <Button size="sm" onClick={() => setModalCategory("new")}>Yangi kategoriya</Button> : undefined}
           />
         ) : (
           <Table>
@@ -124,7 +133,7 @@ export default function CategoriesPage() {
                 <TableHead>Nomi</TableHead>
                 <TableHead>Tavsif</TableHead>
                 <TableHead>Holati</TableHead>
-                <TableHead className="text-right" />
+                {canManage ? <TableHead className="text-right" /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,16 +146,18 @@ export default function CategoriesPage() {
                       {category.is_active ? "Faol" : "Nofaol"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1.5">
-                      <Button variant="ghost" size="icon-sm" onClick={() => setModalCategory(category)} aria-label="Tahrirlash">
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => setDeleteTarget(category)} aria-label="O'chirish">
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManage ? (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setModalCategory(category)} aria-label="Tahrirlash">
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteTarget(category)} aria-label="O'chirish">
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>
