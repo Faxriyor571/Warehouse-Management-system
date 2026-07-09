@@ -12,5 +12,4 @@ export interface Store {
 export interface StoreFormValues {
   name: string;
   address?: string;
-  phone?: string;
 }

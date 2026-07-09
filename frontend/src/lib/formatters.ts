@@ -63,6 +63,13 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   }).format(date);
 }
 
+/** The current moment, formatted for a `<input type="datetime-local">` default value (browser-local time, not UTC — `toISOString()` alone would shift it). */
+export function nowForDatetimeLocalInput(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 /** Up-to-two-letter initials from a full name, for avatar fallbacks. */
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

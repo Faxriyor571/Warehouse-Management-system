@@ -16,13 +16,12 @@ import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TableCard } from "@/components/ui/table-card";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
 import { FormField } from "@/components/forms/form-field";
@@ -31,16 +30,12 @@ const createFormSchema = z.object({
   username: z.string().min(3, "Kamida 3 belgidan iborat bo'lishi kerak"),
   full_name: z.string().min(2, "Kamida 2 belgidan iborat bo'lishi kerak"),
   password: z.string().min(6, "Kamida 6 belgidan iborat bo'lishi kerak"),
-  email: z.string().email("Email noto'g'ri").optional().or(z.literal("")),
-  phone: z.string().optional(),
   store_id: z.string().min(1, "Do'konni tanlash shart"),
 });
 type CreateFormValues = z.infer<typeof createFormSchema>;
 
 const updateFormSchema = z.object({
   full_name: z.string().min(2, "Kamida 2 belgidan iborat bo'lishi kerak"),
-  email: z.string().email("Email noto'g'ri").optional().or(z.literal("")),
-  phone: z.string().optional(),
   store_id: z.string().min(1, "Do'konni tanlash shart"),
 });
 type UpdateFormValues = z.infer<typeof updateFormSchema>;
@@ -74,12 +69,12 @@ export default function EmployeesPage() {
 
   const createForm = useForm<CreateFormValues>({
     resolver: zodResolver(createFormSchema),
-    defaultValues: { username: "", full_name: "", password: "", email: "", phone: "", store_id: "" },
+    defaultValues: { username: "", full_name: "", password: "", store_id: "" },
   });
 
   const updateForm = useForm<UpdateFormValues>({
     resolver: zodResolver(updateFormSchema),
-    defaultValues: { full_name: "", email: "", phone: "", store_id: "" },
+    defaultValues: { full_name: "", store_id: "" },
   });
 
   const passwordForm = useForm<PasswordFormValues>({
@@ -89,14 +84,9 @@ export default function EmployeesPage() {
 
   React.useEffect(() => {
     if (modalEmployee === "new") {
-      createForm.reset({ username: "", full_name: "", password: "", email: "", phone: "", store_id: "" });
+      createForm.reset({ username: "", full_name: "", password: "", store_id: "" });
     } else if (modalEmployee) {
-      updateForm.reset({
-        full_name: modalEmployee.full_name,
-        email: modalEmployee.email ?? "",
-        phone: modalEmployee.phone ?? "",
-        store_id: String(modalEmployee.store_id),
-      });
+      updateForm.reset({ full_name: modalEmployee.full_name, store_id: String(modalEmployee.store_id) });
     }
   }, [modalEmployee, createForm, updateForm]);
 
@@ -173,11 +163,15 @@ export default function EmployeesPage() {
         }
       />
 
-      <TableCard className="mt-6">
+      <div className="mt-6">
         {employeesQuery.isError ? (
           <ErrorState error={employeesQuery.error} onRetry={() => void employeesQuery.refetch()} />
         ) : employeesQuery.isLoading ? (
-          <TableSkeleton />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         ) : employees.length === 0 ? (
           <EmptyState
             title="Hozircha sotuvchilar yo'q"
@@ -185,66 +179,60 @@ export default function EmployeesPage() {
             action={isCeo ? <Button size="sm" onClick={() => setModalEmployee("new")}>Yangi sotuvchi</Button> : undefined}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>F.I.Sh.</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Do'kon</TableHead>
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Oxirgi kirish</TableHead>
-                  <TableHead>Holati</TableHead>
-                  <TableHead className="text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.map((employee) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="font-medium">{employee.full_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{employee.username}</TableCell>
-                    <TableCell className="text-muted-foreground">{employee.store_name}</TableCell>
-                    <TableCell className="text-muted-foreground">{employee.phone ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {employee.last_login_at ? formatDateTime(employee.last_login_at) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={employee.is_active ? "success" : "secondary"} dot>
-                        {employee.is_active ? "Faol" : "Nofaol"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Button variant="ghost" size="icon-sm" onClick={() => setModalEmployee(employee)} aria-label="Tahrirlash">
-                          <Pencil className="size-4" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {employees.map((employee) => (
+              <Card key={employee.id}>
+                <CardContent className="space-y-3 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-foreground">{employee.full_name}</p>
+                      <p className="truncate text-sm text-muted-foreground">@{employee.username}</p>
+                    </div>
+                    <Badge variant={employee.is_active ? "success" : "secondary"} dot>
+                      {employee.is_active ? "Faol" : "Nofaol"}
+                    </Badge>
+                  </div>
+                  <dl className="space-y-1 text-sm">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Do'kon</dt>
+                      <dd className="truncate font-medium text-foreground">{employee.store_name}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-muted-foreground">Oxirgi kirish</dt>
+                      <dd className="text-foreground">{employee.last_login_at ? formatDateTime(employee.last_login_at) : "—"}</dd>
+                    </div>
+                  </dl>
+                  {isCeo ? (
+                    <div className="flex justify-end gap-1.5 border-t border-border/70 pt-3">
+                      <Button variant="ghost" size="icon-sm" onClick={() => setModalEmployee(employee)} aria-label="Tahrirlash">
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => setPasswordTarget(employee)} aria-label="Parolni tiklash">
+                        <KeyRound className="size-4" />
+                      </Button>
+                      {employee.is_active ? (
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeactivateTarget(employee)} aria-label="Nofaol qilish">
+                          <Power className="size-4" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setPasswordTarget(employee)} aria-label="Parolni tiklash">
-                          <KeyRound className="size-4" />
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={activateMutation.isPending}
+                          onClick={() => activateMutation.mutate(employee.id)}
+                          aria-label="Faollashtirish"
+                        >
+                          <Power className="size-4 text-success" />
                         </Button>
-                        {employee.is_active ? (
-                          <Button variant="ghost" size="icon-sm" onClick={() => setDeactivateTarget(employee)} aria-label="Nofaol qilish">
-                            <Power className="size-4" />
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            disabled={activateMutation.isPending}
-                            onClick={() => activateMutation.mutate(employee.id)}
-                            aria-label="Faollashtirish"
-                          >
-                            <Power className="size-4 text-success" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      )}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
-      </TableCard>
+      </div>
 
       <Modal
         open={modalEmployee === "new"}
@@ -285,14 +273,6 @@ export default function EmployeesPage() {
               />
             </FormField>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField htmlFor="employee-email" label="Email" error={createForm.formState.errors.email?.message}>
-              <Input id="employee-email" type="email" {...createForm.register("email")} />
-            </FormField>
-            <FormField htmlFor="employee-phone" label="Telefon">
-              <Input id="employee-phone" placeholder="+998901234567" {...createForm.register("phone")} />
-            </FormField>
-          </div>
         </form>
       </Modal>
 
@@ -330,14 +310,6 @@ export default function EmployeesPage() {
               {...updateForm.register("store_id")}
             />
           </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField htmlFor="employee-edit-email" label="Email" error={updateForm.formState.errors.email?.message}>
-              <Input id="employee-edit-email" type="email" {...updateForm.register("email")} />
-            </FormField>
-            <FormField htmlFor="employee-edit-phone" label="Telefon">
-              <Input id="employee-edit-phone" {...updateForm.register("phone")} />
-            </FormField>
-          </div>
         </form>
       </Modal>
 

@@ -11,7 +11,6 @@ import {
   Store,
   Tag,
   UserCog,
-  Users,
   Wallet,
   Warehouse,
   type LucideIcon,
@@ -68,11 +67,6 @@ export const navSections: NavSection[] = [
       { id: "products", title: "Mahsulotlar", href: "/products", icon: Boxes },
       { id: "categories", title: "Kategoriyalar", href: "/categories", icon: Tag },
     ],
-  },
-  {
-    id: "partners",
-    label: "HAMKORLAR",
-    items: [{ id: "customers", title: "Mijozlar", href: "/customers", icon: Users }],
   },
   {
     id: "operations",

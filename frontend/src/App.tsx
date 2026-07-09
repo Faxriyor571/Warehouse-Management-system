@@ -12,7 +12,6 @@ import LoginPage from "@/pages/LoginPage";
 
 const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
 const CompaniesPage = lazy(() => import("@/pages/CompaniesPage"));
-const CustomersPage = lazy(() => import("@/pages/CustomersPage"));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
 const DebtDetailPage = lazy(() => import("@/pages/DebtDetailPage"));
 const DebtsPage = lazy(() => import("@/pages/DebtsPage"));
@@ -29,6 +28,7 @@ const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const StockInDetailPage = lazy(() => import("@/pages/StockInDetailPage"));
 const StockInNewPage = lazy(() => import("@/pages/StockInNewPage"));
 const StockInPage = lazy(() => import("@/pages/StockInPage"));
+const StoreDetailPage = lazy(() => import("@/pages/StoreDetailPage"));
 const StoresPage = lazy(() => import("@/pages/StoresPage"));
 
 /**
@@ -66,10 +66,10 @@ export default function App() {
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/companies" element={<CompaniesPage />} />
                   <Route path="/stores" element={<StoresPage />} />
+                  <Route path="/stores/:id" element={<StoreDetailPage />} />
                   <Route path="/employees" element={<EmployeesPage />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/categories" element={<CategoriesPage />} />
-                  <Route path="/customers" element={<CustomersPage />} />
                   <Route path="/stock-in" element={<StockInPage />} />
                   <Route path="/stock-in/new" element={<StockInNewPage />} />
                   <Route path="/stock-in/:id" element={<StockInDetailPage />} />

@@ -2,7 +2,6 @@ import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -12,139 +11,76 @@ import { settingService } from "@/services/setting";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TableCard } from "@/components/ui/table-card";
-import { TableSkeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/feedback/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
+import { EmptyState } from "@/components/feedback/empty-state";
 import { FormField } from "@/components/forms/form-field";
 
-const settingFormSchema = z.object({
-  key: z.string().min(1, "Kalit to'ldirilishi shart").max(100),
-  value: z.string().optional(),
+const companyNameFormSchema = z.object({
+  name: z.string().min(2, "Nomi kamida 2 belgidan iborat bo'lishi kerak"),
 });
-type SettingFormSchemaValues = z.infer<typeof settingFormSchema>;
-
-type ModalState = "new" | { key: string; value: string | null } | null;
+type CompanyNameFormValues = z.infer<typeof companyNameFormSchema>;
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  // Settings has no separate read/manage tier — require_settings_manage
-  // (CEO or the legacy admin) gates the whole page, so this only matters
-  // for a non-CEO reaching the page directly by URL (the nav item is
-  // already hidden for them) and seeing an action that could only 403.
-  const canManage = user?.role === "ceo" || user?.role == null;
+  // The legacy single-tenant admin (role === null) has no Company row at
+  // all — settings/company structurally 422s for it. Short-circuit with a
+  // clear message instead of firing the query and rendering that as a
+  // generic, uselessly-retryable error.
+  const hasCompany = user?.company_id != null;
   const queryClient = useQueryClient();
-  const [modalEntry, setModalEntry] = React.useState<ModalState>(null);
+  const companyQuery = useQuery({
+    queryKey: ["settings", "company"],
+    queryFn: settingService.getCompany,
+    enabled: hasCompany,
+  });
 
-  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: settingService.get });
-
-  const form = useForm<SettingFormSchemaValues>({
-    resolver: zodResolver(settingFormSchema),
-    defaultValues: { key: "", value: "" },
+  const form = useForm<CompanyNameFormValues>({
+    resolver: zodResolver(companyNameFormSchema),
+    defaultValues: { name: "" },
   });
 
   React.useEffect(() => {
-    if (modalEntry && modalEntry !== "new") {
-      form.reset({ key: modalEntry.key, value: modalEntry.value ?? "" });
-    } else if (modalEntry === "new") {
-      form.reset({ key: "", value: "" });
-    }
-  }, [modalEntry, form]);
+    if (companyQuery.data) form.reset({ name: companyQuery.data.name });
+  }, [companyQuery.data, form]);
 
-  const upsertMutation = useMutation({
-    mutationFn: (values: SettingFormSchemaValues) => settingService.upsert(values.key, values.value || null),
+  const updateMutation = useMutation({
+    mutationFn: (values: CompanyNameFormValues) => settingService.updateCompany(values.name),
     onSuccess: () => {
-      toast.success("Sozlama saqlandi.");
-      setModalEntry(null);
-      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      toast.success("Kompaniya nomi yangilandi.");
+      void queryClient.invalidateQueries({ queryKey: ["settings", "company"] });
     },
     onError: toastMutationError,
   });
 
-  const isEditingExisting = modalEntry !== null && modalEntry !== "new";
-  const entries = Object.entries(settingsQuery.data ?? {});
-
   return (
     <ContentContainer>
-      <PageHeader
-        title="Sozlamalar"
-        description="Kompaniyangizning konfiguratsiya kalit-qiymat juftliklari."
-        actions={
-          canManage ? (
-            <Button onClick={() => setModalEntry("new")}>
-              <Plus />
-              Sozlama qo'shish
-            </Button>
-          ) : null
-        }
-      />
+      <PageHeader title="Sozlamalar" description="Kompaniyangiz profilini boshqaring." />
 
-      <TableCard className="mt-6">
-        {settingsQuery.isError ? (
-          <ErrorState error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} />
-        ) : settingsQuery.isLoading ? (
-          <TableSkeleton />
-        ) : entries.length === 0 ? (
-          <EmptyState
-            title="Hozircha sozlamalar yo'q"
-            description={canManage ? "Boshlash uchun birinchi sozlamangizni qo'shing." : "Sozlamalar topilmadi."}
-            action={canManage ? <Button size="sm" onClick={() => setModalEntry("new")}>Sozlama qo'shish</Button> : undefined}
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Kalit</TableHead>
-                <TableHead>Qiymat</TableHead>
-                {canManage ? <TableHead className="text-right" /> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map(([key, value]) => (
-                <TableRow key={key}>
-                  <TableCell className="font-medium">{key}</TableCell>
-                  <TableCell className="text-muted-foreground">{value ?? "—"}</TableCell>
-                  {canManage ? (
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon-sm" onClick={() => setModalEntry({ key, value })} aria-label="Tahrirlash">
-                        <Pencil className="size-4" />
-                      </Button>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </TableCard>
-
-      <Modal
-        open={modalEntry !== null}
-        onOpenChange={(open) => !open && setModalEntry(null)}
-        title={modalEntry === "new" ? "Sozlama qo'shish" : "Sozlamani tahrirlash"}
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setModalEntry(null)}>
-              Bekor qilish
-            </Button>
-            <Button onClick={form.handleSubmit((v) => upsertMutation.mutate(v))} loading={upsertMutation.isPending}>
-              Saqlash
-            </Button>
-          </>
-        }
-      >
-        <form className="space-y-4" onSubmit={form.handleSubmit((v) => upsertMutation.mutate(v))}>
-          <FormField htmlFor="setting-key" label="Kalit" required error={form.formState.errors.key?.message}>
-            <Input id="setting-key" disabled={isEditingExisting} invalid={!!form.formState.errors.key} {...form.register("key")} />
-          </FormField>
-          <FormField htmlFor="setting-value" label="Qiymat">
-            <Input id="setting-value" {...form.register("value")} />
-          </FormField>
-        </form>
-      </Modal>
+      <Card className="mt-6 max-w-lg">
+        <CardContent className="p-5">
+          {!hasCompany ? (
+            <EmptyState compact title="Kompaniya profili mavjud emas" description="Bu funksiya yagona tenant (legacy admin) rejimida mavjud emas." />
+          ) : companyQuery.isError ? (
+            <ErrorState error={companyQuery.error} onRetry={() => void companyQuery.refetch()} />
+          ) : companyQuery.isLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : (
+            <form className="space-y-4" onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}>
+              <FormField htmlFor="company-name" label="Kompaniya nomi" required error={form.formState.errors.name?.message}>
+                <Input id="company-name" invalid={!!form.formState.errors.name} {...form.register("name")} />
+              </FormField>
+              <div className="flex justify-end">
+                <Button type="submit" loading={updateMutation.isPending}>
+                  Saqlash
+                </Button>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
     </ContentContainer>
   );
 }

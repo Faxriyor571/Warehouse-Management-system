@@ -1,25 +1,24 @@
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Pencil, Plus, Power } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { cn } from "@/lib/utils";
 import { toastMutationError } from "@/lib/mutation";
 import { useAuth } from "@/providers/auth-provider";
 import { storeService } from "@/services/store";
-import type { Store } from "@/types/store";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TableCard } from "@/components/ui/table-card";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
 import { FormField } from "@/components/forms/form-field";
@@ -27,82 +26,47 @@ import { FormField } from "@/components/forms/form-field";
 const storeFormSchema = z.object({
   name: z.string().min(2, "Nomi kamida 2 belgidan iborat bo'lishi kerak"),
   address: z.string().optional(),
-  phone: z.string().optional(),
 });
 type StoreFormValues = z.infer<typeof storeFormSchema>;
 
-type ModalState = "new" | Store | null;
-
 export default function StoresPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isCeo = user?.role === "ceo";
   const queryClient = useQueryClient();
-  const [modalStore, setModalStore] = React.useState<ModalState>(null);
-  const [deactivateTarget, setDeactivateTarget] = React.useState<Store | null>(null);
+  const [creating, setCreating] = React.useState(false);
 
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list });
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeFormSchema),
-    defaultValues: { name: "", address: "", phone: "" },
+    defaultValues: { name: "", address: "" },
   });
 
   React.useEffect(() => {
-    if (modalStore && modalStore !== "new") {
-      form.reset({ name: modalStore.name, address: modalStore.address ?? "", phone: modalStore.phone ?? "" });
-    } else if (modalStore === "new") {
-      form.reset({ name: "", address: "", phone: "" });
-    }
-  }, [modalStore, form]);
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["stores"] });
+    if (creating) form.reset({ name: "", address: "" });
+  }, [creating, form]);
 
   const createMutation = useMutation({
     mutationFn: storeService.create,
     onSuccess: () => {
       toast.success("Do'kon yaratildi.");
-      setModalStore(null);
-      void invalidate();
+      setCreating(false);
+      void queryClient.invalidateQueries({ queryKey: ["stores"] });
     },
     onError: toastMutationError,
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: StoreFormValues }) => storeService.update(id, data),
-    onSuccess: () => {
-      toast.success("Do'kon yangilandi.");
-      setModalStore(null);
-      void invalidate();
-    },
-    onError: toastMutationError,
-  });
-
-  const deactivateMutation = useMutation({
-    mutationFn: storeService.deactivate,
-    onSuccess: () => {
-      toast.success("Do'kon faolsizlantirildi.");
-      setDeactivateTarget(null);
-      void invalidate();
-    },
-    onError: toastMutationError,
-  });
-
-  const onSubmit = (values: StoreFormValues) => {
-    if (modalStore === "new") createMutation.mutate(values);
-    else if (modalStore) updateMutation.mutate({ id: modalStore.id, data: values });
-  };
-
-  const isEditing = modalStore !== null;
   const stores = storesQuery.data ?? [];
 
   return (
     <ContentContainer>
       <PageHeader
         title="Do'konlar"
-        description={isCeo ? "Kompaniyangizdagi do'konlarni boshqaring." : "Kompaniyangizdagi do'konlar."}
+        description={isCeo ? "Do'konni tanlab batafsil ma'lumotni ko'ring." : "Kompaniyangizdagi do'konlar."}
         actions={
           isCeo ? (
-            <Button onClick={() => setModalStore("new")}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               Yangi do'kon
             </Button>
@@ -110,108 +74,79 @@ export default function StoresPage() {
         }
       />
 
-      <TableCard className="mt-6">
+      <div className="mt-6">
         {storesQuery.isError ? (
           <ErrorState error={storesQuery.error} onRetry={() => void storesQuery.refetch()} />
         ) : storesQuery.isLoading ? (
-          <TableSkeleton />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         ) : stores.length === 0 ? (
           <EmptyState
             title="Hozircha do'konlar yo'q"
             description={isCeo ? "Boshlash uchun birinchi do'koningizni yarating." : "Do'konlar topilmadi."}
-            action={isCeo ? <Button size="sm" onClick={() => setModalStore("new")}>Yangi do'kon</Button> : undefined}
+            action={isCeo ? <Button size="sm" onClick={() => setCreating(true)}>Yangi do'kon</Button> : undefined}
           />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nomi</TableHead>
-                {isCeo ? (
-                  <>
-                    <TableHead>Manzil</TableHead>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Holati</TableHead>
-                    <TableHead className="text-right" />
-                  </>
-                ) : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stores.map((store) => (
-                <TableRow key={store.id}>
-                  <TableCell className="font-medium">{store.name}</TableCell>
-                  {isCeo ? (
-                    <>
-                      <TableCell className="text-muted-foreground">{store.address ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{store.phone ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={store.is_active ? "success" : "secondary"} dot>
-                          {store.is_active ? "Faol" : "Nofaol"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <Button variant="ghost" size="icon-sm" onClick={() => setModalStore(store)} aria-label="Tahrirlash">
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            disabled={!store.is_active}
-                            onClick={() => setDeactivateTarget(store)}
-                            aria-label="Faolsizlantirish"
-                          >
-                            <Power className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {stores.map((store) => (
+              <Card
+                key={store.id}
+                role={isCeo ? "button" : undefined}
+                tabIndex={isCeo ? 0 : undefined}
+                onClick={isCeo ? () => navigate(`/stores/${store.id}`) : undefined}
+                onKeyDown={
+                  isCeo
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/stores/${store.id}`);
+                        }
+                      }
+                    : undefined
+                }
+                className={cn(isCeo && "cursor-pointer transition-colors hover:border-primary/40")}
+              >
+                <CardContent className="flex items-center justify-between gap-3 p-5">
+                  <p className="min-w-0 truncate text-base font-semibold text-foreground">{store.name}</p>
+                  {store.is_active !== undefined ? (
+                    <Badge variant={store.is_active ? "success" : "secondary"} dot>
+                      {store.is_active ? "Faol" : "Nofaol"}
+                    </Badge>
                   ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
-      </TableCard>
+      </div>
 
       <Modal
-        open={isEditing}
-        onOpenChange={(open) => !open && setModalStore(null)}
-        title={modalStore === "new" ? "Yangi do'kon" : "Do'konni tahrirlash"}
+        open={creating}
+        onOpenChange={setCreating}
+        title="Yangi do'kon"
         footer={
           <>
-            <Button variant="outline" onClick={() => setModalStore(null)}>
+            <Button variant="outline" onClick={() => setCreating(false)}>
               Bekor qilish
             </Button>
-            <Button onClick={form.handleSubmit(onSubmit)} loading={createMutation.isPending || updateMutation.isPending}>
+            <Button onClick={form.handleSubmit((v) => createMutation.mutate(v))} loading={createMutation.isPending}>
               Saqlash
             </Button>
           </>
         }
       >
-        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+        <form className="space-y-4" onSubmit={form.handleSubmit((v) => createMutation.mutate(v))}>
           <FormField htmlFor="store-name" label="Nomi" required error={form.formState.errors.name?.message}>
             <Input id="store-name" invalid={!!form.formState.errors.name} {...form.register("name")} />
           </FormField>
           <FormField htmlFor="store-address" label="Manzil">
             <Input id="store-address" {...form.register("address")} />
           </FormField>
-          <FormField htmlFor="store-phone" label="Telefon">
-            <Input id="store-phone" {...form.register("phone")} />
-          </FormField>
         </form>
       </Modal>
-
-      <ConfirmDialog
-        open={deactivateTarget !== null}
-        onOpenChange={(open) => !open && setDeactivateTarget(null)}
-        title={`${deactivateTarget?.name} faolsizlantirilsinmi?`}
-        description="Do'kon endi yangi amaliyotlar uchun ishlatib bo'lmaydi."
-        confirmLabel="Faolsizlantirish"
-        variant="destructive"
-        loading={deactivateMutation.isPending}
-        onConfirm={() => deactivateTarget && deactivateMutation.mutate(deactivateTarget.id)}
-      />
     </ContentContainer>
   );
 }

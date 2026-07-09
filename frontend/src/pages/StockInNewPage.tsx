@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
-import { formatMoney } from "@/lib/formatters";
+import { formatMoney, nowForDatetimeLocalInput } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { productService } from "@/services/product";
 import { stockInService } from "@/services/stock-in";
@@ -45,7 +45,7 @@ export default function StockInNewPage() {
 
   const form = useForm<StockInFormValues>({
     resolver: zodResolver(stockInFormSchema),
-    defaultValues: { store_id: "", date: "", note: "", items: [{ product_id: "", quantity: 1, price: 0 }] },
+    defaultValues: { store_id: "", date: nowForDatetimeLocalInput(), note: "", items: [{ product_id: "", quantity: 1, price: 0 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
@@ -108,7 +108,7 @@ export default function StockInNewPage() {
             <h2 className="text-sm font-medium text-foreground">Qatorlar</h2>
             <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: "", quantity: 1, price: 0 })}>
               <Plus />
-              Qator qo'shish
+              Boshqa mahsulot qo'shish
             </Button>
           </div>
 

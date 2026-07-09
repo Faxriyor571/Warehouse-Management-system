@@ -155,3 +155,58 @@ def test_company_isolation(client: TestClient, db_session: Session) -> None:
     client.put("/api/v1/settings", headers=ceo_b, json={"key": "currency", "value": "USD"})
     assert client.get("/api/v1/settings", headers=ceo_a).json() == {"currency": "UZS"}
     assert client.get("/api/v1/settings", headers=ceo_b).json() == {"currency": "USD"}
+
+
+# ---------------------------------------------------------------------------
+# Company name (Settings page v1: the only field CEOs can edit there)
+# ---------------------------------------------------------------------------
+def test_ceo_reads_own_company_name(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "set-k")
+    resp = client.get("/api/v1/settings/company", headers=ceo)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["name"] == "Co set-k"
+
+
+def test_ceo_renames_own_company(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "set-l")
+    resp = client.put("/api/v1/settings/company", headers=ceo, json={"name": "Renamed Co"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["name"] == "Renamed Co"
+    assert client.get("/api/v1/settings/company", headers=ceo).json()["name"] == "Renamed Co"
+
+
+def test_rename_rejects_too_short_name(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "set-m")
+    resp = client.put("/api/v1/settings/company", headers=ceo, json={"name": "A"})
+    assert resp.status_code == 422, resp.text
+
+
+def test_rename_does_not_affect_other_companies(client: TestClient, db_session: Session) -> None:
+    ceo_a = _onboard(client, db_session, "set-n1")
+    ceo_b = _onboard(client, db_session, "set-n2")
+    client.put("/api/v1/settings/company", headers=ceo_a, json={"name": "Only A Renamed"})
+
+    assert client.get("/api/v1/settings/company", headers=ceo_a).json()["name"] == "Only A Renamed"
+    assert client.get("/api/v1/settings/company", headers=ceo_b).json()["name"] == "Co set-n2"
+
+
+def test_seller_no_access_to_company_profile(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "set-o")
+    store_id = _store(client, ceo)
+    seller = _seller(client, ceo, "set-o", "seller-set-o", store_id)
+    assert client.get("/api/v1/settings/company", headers=seller).status_code == 403
+    assert client.put("/api/v1/settings/company", headers=seller, json={"name": "Hack"}).status_code == 403
+
+
+def test_super_admin_no_access_to_company_profile(client: TestClient, db_session: Session) -> None:
+    _make_super_admin(db_session, "root-set-p")
+    sa = _bearer(client, "root-set-p", "Root12345!")
+    assert client.get("/api/v1/settings/company", headers=sa).status_code == 403
+
+
+def test_legacy_admin_has_no_company_profile(client: TestClient, auth_headers: dict[str, str]) -> None:
+    """The legacy single-tenant admin operates in the NULL-company scope —
+    there's no Company row to rename, so this is a clean validation error,
+    not a crash."""
+    resp = client.get("/api/v1/settings/company", headers=auth_headers)
+    assert resp.status_code == 422, resp.text

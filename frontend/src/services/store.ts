@@ -7,6 +7,11 @@ export const storeService = {
     return data;
   },
 
+  async get(id: number): Promise<Store> {
+    const { data } = await http.get<Store>(`/stores/${id}`);
+    return data;
+  },
+
   async create(payload: StoreFormValues): Promise<Store> {
     const { data } = await http.post<Store>("/stores", payload);
     return data;

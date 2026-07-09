@@ -35,6 +35,14 @@ class CompanyUpdate(BaseModel):
     contact_phone: str | None = Field(default=None, max_length=30)
 
 
+class CompanyNameUpdate(BaseModel):
+    """Settings page payload: a CEO renaming their own company. Deliberately
+    narrower than CompanyUpdate (name required, no email/phone) — this is
+    the only company field Settings exposes."""
+
+    name: str = Field(min_length=2, max_length=200)
+
+
 class CompanyOut(BaseModel):
     """Company as returned by the API. No business data (SRS §3.1)."""
 

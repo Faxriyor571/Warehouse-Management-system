@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
-import { formatMoney } from "@/lib/formatters";
+import { formatMoney, nowForDatetimeLocalInput } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
 import { paymentMethodService } from "@/services/payment-method";
@@ -86,6 +86,7 @@ function buildSaleFormSchema(priceByProductId: Record<string, number>) {
       customer_id: z.string().optional(),
       debtor_full_name: z.string().optional(),
       debtor_phone: z.string().optional(),
+      debtor_company_name: z.string().optional(),
       date: z.string().optional(),
       discount: z.coerce.number({ invalid_type_error: "Chegirma raqam bo'lishi kerak" }).nonnegative("0 yoki undan katta bo'lishi kerak"),
       note: z.string().optional(),
@@ -106,8 +107,12 @@ function buildSaleFormSchema(priceByProductId: Record<string, number>) {
         if (!data.debtor_phone || data.debtor_phone.trim().length < 5) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["debtor_phone"], message: "Telefon raqami kiritilishi shart" });
         }
-      } else if (!data.customer_id) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer_id"], message: "Kompaniyani tanlash shart" });
+      } else if (!data.debtor_company_name || data.debtor_company_name.trim().length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["debtor_company_name"],
+          message: "Kompaniya nomi kamida 2 belgidan iborat bo'lishi kerak",
+        });
       }
     });
 }
@@ -141,7 +146,8 @@ export default function SalesNewPage() {
       customer_id: "",
       debtor_full_name: "",
       debtor_phone: "",
-      date: "",
+      debtor_company_name: "",
+      date: nowForDatetimeLocalInput(),
       discount: 0,
       note: "",
       due_date: "",
@@ -161,14 +167,15 @@ export default function SalesNewPage() {
     () => (storesQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
     [storesQuery.data]
   );
-  // Only legal-entity customers are selectable as a debt owner here — an
-  // individual debtor is created inline (see onSubmit) rather than picked
-  // from the list.
-  const legalEntityCustomerOptions = React.useMemo(
-    () =>
-      (customersQuery.data ?? [])
-        .filter((c) => c.customer_type === "legal_entity")
-        .map((c) => ({ label: c.full_name, value: String(c.id) })),
+  // There's no standalone Customers management page anymore — a Company
+  // debt owner is typed as plain text and resolved at submit time: reuse an
+  // existing legal-entity customer if the name matches one exactly
+  // (case-insensitive), otherwise create a new one inline, exactly like an
+  // Individual debtor already does. The name list backs a <datalist> on the
+  // input so repeat customers show up as a suggestion instead of risking a
+  // near-duplicate record from a typo.
+  const legalEntityCustomerNames = React.useMemo(
+    () => (customersQuery.data ?? []).filter((c) => c.customer_type === "legal_entity").map((c) => c.full_name),
     [customersQuery.data]
   );
   const productOptions = React.useMemo(
@@ -238,9 +245,8 @@ export default function SalesNewPage() {
         return;
       }
 
-      // A debt will result. An individual debtor doesn't get picked from a
-      // list — they're created inline via the existing customer endpoint,
-      // then attached to the sale.
+      // A debt will result. Neither debtor type is picked from a list —
+      // there's no standalone Customers page to manage them ahead of time.
       if (values.customer_type === "individual") {
         const customer = await customerService.create({
           full_name: values.debtor_full_name,
@@ -252,7 +258,16 @@ export default function SalesNewPage() {
         return;
       }
 
-      createMutation.mutate(values);
+      // Company: reuse an existing legal-entity customer with this exact
+      // name (case-insensitive) if one exists, so repeat business
+      // aggregates under one customer record instead of fragmenting across
+      // a new one per sale; otherwise create it inline.
+      const typedName = values.debtor_company_name?.trim() ?? "";
+      const existing = (customersQuery.data ?? []).find(
+        (c) => c.customer_type === "legal_entity" && c.full_name.trim().toLowerCase() === typedName.toLowerCase()
+      );
+      const company = existing ?? (await customerService.create({ full_name: typedName, customer_type: "legal_entity", is_active: true }));
+      createMutation.mutate({ ...values, customer_id: String(company.id) });
     } catch (err) {
       toastMutationError(err);
     } finally {
@@ -281,7 +296,7 @@ export default function SalesNewPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField htmlFor="sale-discount" label="Hujjat chegirmasi">
+          <FormField htmlFor="sale-discount" label="Umumiy chegirma">
             <Input id="sale-discount" type="number" step="0.01" {...form.register("discount")} />
           </FormField>
           <FormField htmlFor="sale-note" label="Izoh">
@@ -299,7 +314,7 @@ export default function SalesNewPage() {
               onClick={() => itemsArray.append({ product_id: "", quantity: 1, price: undefined, discount: 0 })}
             >
               <Plus />
-              Qator qo'shish
+              Boshqa mahsulot qo'shish
             </Button>
           </div>
 
@@ -439,18 +454,23 @@ export default function SalesNewPage() {
               </div>
             ) : (
               <FormField
-                htmlFor="sale-debt-customer"
-                label="Kompaniya"
+                htmlFor="sale-debt-company"
+                label="Kompaniya nomi"
                 required
-                error={form.formState.errors.customer_id?.message}
+                error={form.formState.errors.debtor_company_name?.message}
               >
-                <Select
-                  id="sale-debt-customer"
-                  options={legalEntityCustomerOptions}
-                  placeholder="Kompaniyani tanlang…"
-                  invalid={!!form.formState.errors.customer_id}
-                  {...form.register("customer_id")}
+                <Input
+                  id="sale-debt-company"
+                  list="sale-debt-company-suggestions"
+                  placeholder="Kompaniya nomini kiriting…"
+                  invalid={!!form.formState.errors.debtor_company_name}
+                  {...form.register("debtor_company_name")}
                 />
+                <datalist id="sale-debt-company-suggestions">
+                  {legalEntityCustomerNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </FormField>
             )}
 

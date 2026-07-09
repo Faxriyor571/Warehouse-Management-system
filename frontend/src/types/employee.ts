@@ -16,15 +16,11 @@ export interface EmployeeCreateFormValues {
   username: string;
   full_name: string;
   password: string;
-  email?: string;
-  phone?: string;
   store_id: string;
 }
 
 export interface EmployeeUpdateFormValues {
   full_name: string;
-  email?: string;
-  phone?: string;
   store_id: string;
 }
 

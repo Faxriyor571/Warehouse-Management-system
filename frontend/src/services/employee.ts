@@ -20,8 +20,6 @@ export const employeeService = {
       username: values.username,
       full_name: values.full_name,
       password: values.password,
-      email: values.email || null,
-      phone: values.phone || null,
       store_id: Number(values.store_id),
     });
     return data;
@@ -30,8 +28,6 @@ export const employeeService = {
   async update(id: number, values: EmployeeUpdateFormValues): Promise<Employee> {
     const { data } = await http.put<Employee>(`/employees/${id}`, {
       full_name: values.full_name,
-      email: values.email || null,
-      phone: values.phone || null,
       store_id: Number(values.store_id),
     });
     return data;

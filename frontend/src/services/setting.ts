@@ -1,14 +1,14 @@
 import { http } from "@/lib/http";
-import type { SettingsMap } from "@/types/setting";
+import type { Company } from "@/types/company";
 
 export const settingService = {
-  async get(): Promise<SettingsMap> {
-    const { data } = await http.get<SettingsMap>("/settings");
+  async getCompany(): Promise<Company> {
+    const { data } = await http.get<Company>("/settings/company");
     return data;
   },
 
-  async upsert(key: string, value: string | null): Promise<SettingsMap> {
-    const { data } = await http.put<SettingsMap>("/settings", { key, value });
+  async updateCompany(name: string): Promise<Company> {
+    const { data } = await http.put<Company>("/settings/company", { name });
     return data;
   },
 };
