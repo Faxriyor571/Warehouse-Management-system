@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { reportService } from "@/services/report";
 import { storeService } from "@/services/store";
@@ -161,7 +161,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
           ) : (
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ left: -16, right: 8, top: 8 }}>
+                <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 8 }}>
                   <defs>
                     <linearGradient id="fillReports" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -170,7 +170,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => formatCompactNumber(v)} className="text-xs" stroke="hsl(var(--muted-foreground))" />
                   <RechartsTooltip
                     contentStyle={{
                       background: "hsl(var(--popover))",
@@ -179,7 +179,8 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
                       fontSize: "0.8125rem",
                       color: "hsl(var(--popover-foreground))",
                     }}
-                    formatter={(value: number) => formatCurrency(value, CURRENCY)}
+                    labelFormatter={(label: string) => formatDate(label)}
+                    formatter={(value: number) => [formatCurrency(value, CURRENCY), "Savdo"]}
                   />
                   <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#fillReports)" />
                 </AreaChart>
@@ -370,7 +371,7 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
           ) : (
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ left: -16, right: 8, top: 8 }}>
+                <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 8 }}>
                   <defs>
                     <linearGradient id="fillExpenses" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
@@ -379,7 +380,7 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => formatCompactNumber(v)} className="text-xs" stroke="hsl(var(--muted-foreground))" />
                   <RechartsTooltip
                     contentStyle={{
                       background: "hsl(var(--popover))",
@@ -388,7 +389,8 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
                       fontSize: "0.8125rem",
                       color: "hsl(var(--popover-foreground))",
                     }}
-                    formatter={(value: number) => formatCurrency(value, CURRENCY)}
+                    labelFormatter={(label: string) => formatDate(label)}
+                    formatter={(value: number) => [formatCurrency(value, CURRENCY), "Xarajat"]}
                   />
                   <Area type="monotone" dataKey="value" stroke="hsl(var(--destructive))" strokeWidth={2} fill="url(#fillExpenses)" />
                 </AreaChart>
