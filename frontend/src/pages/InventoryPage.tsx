@@ -109,7 +109,7 @@ function StoreStockView({ storeId }: { storeId?: number }) {
   return (
     <div className="space-y-4">
       <SearchInput
-        placeholder="Mahsulot nomi yoki SKU bo'yicha qidirish…"
+        placeholder="Nomi yoki SKU bo'yicha qidirish…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="w-72"
@@ -269,7 +269,7 @@ function MovementsView({ storeId }: { storeId?: number }) {
                       {formatNumber(movement.quantity_delta)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {movement.reference_type}
+                      {movementTypeLabels[movement.reference_type as MovementType] ?? movement.reference_type}
                       {movement.reference_id ? ` #${movement.reference_id}` : ""}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{movement.created_by ?? "—"}</TableCell>
