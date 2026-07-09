@@ -18,6 +18,12 @@ export interface CeoSummary {
   email: string | null;
 }
 
+export interface CompanyUpdateInput {
+  name: string;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+}
+
 export interface CompanyCreateInput {
   name: string;
   slug: string;

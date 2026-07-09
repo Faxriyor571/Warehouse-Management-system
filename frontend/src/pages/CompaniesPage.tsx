@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { LogIn, Plus, Power, PowerOff } from "lucide-react";
+import { LogIn, Pencil, Plus, Power, PowerOff } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -49,6 +49,13 @@ const companyFormSchema = z.object({
 });
 type CompanyFormValues = z.infer<typeof companyFormSchema>;
 
+const editFormSchema = z.object({
+  name: z.string().min(2, "Nomi kamida 2 belgidan iborat bo'lishi kerak"),
+  contact_email: z.string().email("Email noto'g'ri").optional().or(z.literal("")),
+  contact_phone: z.string().optional(),
+});
+type EditFormValues = z.infer<typeof editFormSchema>;
+
 export default function CompaniesPage() {
   const navigate = useNavigate();
   const { enterSupportSession } = useAuth();
@@ -57,6 +64,7 @@ export default function CompaniesPage() {
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [editTarget, setEditTarget] = React.useState<Company | null>(null);
   const [suspendTarget, setSuspendTarget] = React.useState<Company | null>(null);
   const [enteringId, setEnteringId] = React.useState<number | null>(null);
 
@@ -69,6 +77,21 @@ export default function CompaniesPage() {
     resolver: zodResolver(companyFormSchema),
     defaultValues: { name: "", slug: "", contact_email: "", contact_phone: "", ceo_username: "", ceo_full_name: "", ceo_password: "", ceo_email: "" },
   });
+
+  const editForm = useForm<EditFormValues>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: { name: "", contact_email: "", contact_phone: "" },
+  });
+
+  React.useEffect(() => {
+    if (editTarget) {
+      editForm.reset({
+        name: editTarget.name,
+        contact_email: editTarget.contact_email ?? "",
+        contact_phone: editTarget.contact_phone ?? "",
+      });
+    }
+  }, [editTarget, editForm]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["companies"] });
 
@@ -90,6 +113,21 @@ export default function CompaniesPage() {
       toast.success(`"${result.company.name}" kompaniyasi va uning CEO hisobi yaratildi.`);
       setIsCreateOpen(false);
       form.reset();
+      void invalidate();
+    },
+    onError: toastMutationError,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: EditFormValues) =>
+      companyService.update(editTarget!.id, {
+        name: values.name,
+        contact_email: values.contact_email || null,
+        contact_phone: values.contact_phone || null,
+      }),
+    onSuccess: () => {
+      toast.success("Kompaniya yangilandi.");
+      setEditTarget(null);
       void invalidate();
     },
     onError: toastMutationError,
@@ -217,6 +255,9 @@ export default function CompaniesPage() {
                             <LogIn className="size-3.5" />
                             Kirish
                           </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => setEditTarget(company)} aria-label="Tahrirlash">
+                            <Pencil className="size-4" />
+                          </Button>
                           {company.status === "active" ? (
                             <Button variant="ghost" size="icon-sm" onClick={() => setSuspendTarget(company)} aria-label="Faolsizlantirish">
                               <PowerOff className="size-4" />
@@ -299,6 +340,37 @@ export default function CompaniesPage() {
                 <Input id="ceo-email" type="email" {...form.register("ceo_email")} />
               </FormField>
             </div>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={editTarget !== null}
+        onOpenChange={(open) => !open && setEditTarget(null)}
+        title="Kompaniyani tahrirlash"
+        description="Identifikator (slug) yaratilgandan keyin o'zgartirilmaydi."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>
+              Bekor qilish
+            </Button>
+            <Button onClick={editForm.handleSubmit((v) => updateMutation.mutate(v))} loading={updateMutation.isPending}>
+              Saqlash
+            </Button>
+          </>
+        }
+      >
+        <form className="space-y-4" onSubmit={editForm.handleSubmit((v) => updateMutation.mutate(v))}>
+          <FormField htmlFor="edit-company-name" label="Nomi" required error={editForm.formState.errors.name?.message}>
+            <Input id="edit-company-name" invalid={!!editForm.formState.errors.name} {...editForm.register("name")} />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField htmlFor="edit-company-email" label="Aloqa emaili" error={editForm.formState.errors.contact_email?.message}>
+              <Input id="edit-company-email" type="email" {...editForm.register("contact_email")} />
+            </FormField>
+            <FormField htmlFor="edit-company-phone" label="Aloqa telefoni">
+              <Input id="edit-company-phone" placeholder="+998901234567" {...editForm.register("contact_phone")} />
+            </FormField>
           </div>
         </form>
       </Modal>

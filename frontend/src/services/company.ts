@@ -5,6 +5,7 @@ import type {
   CompanyCreateInput,
   CompanyCreateResponse,
   CompanyStatus,
+  CompanyUpdateInput,
   SupportSessionResponse,
 } from "@/types/company";
 
@@ -25,6 +26,11 @@ export const companyService = {
 
   async create(payload: CompanyCreateInput): Promise<CompanyCreateResponse> {
     const { data } = await http.post<CompanyCreateResponse>("/companies", payload);
+    return data;
+  },
+
+  async update(id: number, payload: CompanyUpdateInput): Promise<Company> {
+    const { data } = await http.put<Company>(`/companies/${id}`, payload);
     return data;
   },
 
