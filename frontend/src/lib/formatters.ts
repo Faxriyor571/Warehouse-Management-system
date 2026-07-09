@@ -70,3 +70,17 @@ export function getInitials(name: string): string {
   if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
   return `${parts[0]?.[0] ?? ""}${parts[parts.length - 1]?.[0] ?? ""}`.toUpperCase();
 }
+
+const BUSINESS_UTC_OFFSET_HOURS = 5;
+
+/**
+ * Today's calendar date (YYYY-MM-DD) in business-local (Uzbekistan, UTC+5)
+ * time — mirrors the backend's `business_today()` so a "due today" debt
+ * comparison agrees with the server regardless of the browser's own
+ * timezone, the same way the backend avoids attributing late-night activity
+ * to the wrong calendar day.
+ */
+export function businessTodayISO(): string {
+  const shifted = Date.now() + BUSINESS_UTC_OFFSET_HOURS * 60 * 60 * 1000;
+  return new Date(shifted).toISOString().slice(0, 10);
+}

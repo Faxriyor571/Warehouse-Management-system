@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Building2, DollarSign, LogIn, PlusCircle, Receipt, ShoppingCart, Users } from "lucide-react";
+import { AlertTriangle, Building2, DollarSign, LogIn, PlusCircle, Receipt, ShoppingCart, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -19,11 +19,13 @@ import { getErrorMessage } from "@/lib/http";
 import { useAuth } from "@/providers/auth-provider";
 import { companyService } from "@/services/company";
 import { dashboardService } from "@/services/dashboard";
+import { reportService } from "@/services/report";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -40,8 +42,21 @@ export default function DashboardPage() {
 }
 
 function TenantDashboard() {
+  const navigate = useNavigate();
   const query = useQuery({ queryKey: ["dashboard"], queryFn: dashboardService.getStats });
   const stats = query.data;
+
+  // Store-scoping for Seller (and company-wide for CEO) is already enforced
+  // server-side by this endpoint's existing scope resolution — no extra
+  // filtering needed here. Detailed debt stats (overdue/due-today/active/
+  // paid) live only on the Debts page now — this is just the top-of-page
+  // alert, so CEO/Seller still see it immediately after login.
+  const debtReportQuery = useQuery({ queryKey: ["reports", "debts", "dashboard-alert"], queryFn: () => reportService.debts({}) });
+
+  const overdueBucket = debtReportQuery.data?.by_status.find((b) => b.status === "overdue");
+  const overdueCount = overdueBucket?.count ?? 0;
+  const overdueTotal = overdueBucket?.remaining ?? "0";
+  const netProfit = stats ? Number(stats.month_revenue) - Number(stats.month_expenses) : 0;
 
   return (
     <ContentContainer>
@@ -60,6 +75,22 @@ function TenantDashboard() {
         <ErrorState error={query.error} className="mt-6" onRetry={() => void query.refetch()} />
       ) : (
         <>
+          {overdueCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => navigate("/debts?status=overdue")}
+              className="mt-6 flex w-full items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left transition-colors hover:bg-destructive/10"
+            >
+              <AlertTriangle className="size-5 shrink-0 text-destructive" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-destructive">
+                  {formatNumber(overdueCount)} ta qarz muddati o'tgan — jami {formatCurrency(overdueTotal, CURRENCY)}
+                </p>
+                <p className="text-xs text-destructive/80">Batafsil ko'rish uchun bosing.</p>
+              </div>
+            </button>
+          ) : null}
+
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {query.isLoading || !stats ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
@@ -85,11 +116,10 @@ function TenantDashboard() {
                   value={formatCurrency(stats.month_expenses, CURRENCY)}
                 />
                 <StatCard
-                  label="Qarzdorlar"
-                  icon={Users}
-                  tone="destructive"
-                  value={formatNumber(stats.debtors_count)}
-                  sub={formatCurrency(stats.debtors_total, CURRENCY)}
+                  label="Sof foyda"
+                  icon={TrendingUp}
+                  tone={netProfit >= 0 ? "success" : "destructive"}
+                  value={formatCurrency(netProfit, CURRENCY)}
                 />
               </>
             )}
@@ -383,42 +413,6 @@ function PlatformDashboard() {
         </>
       )}
     </ContentContainer>
-  );
-}
-
-const statToneClass = {
-  primary: "bg-primary/10 text-primary",
-  success: "bg-success/10 text-success",
-  warning: "bg-warning/15 text-warning",
-  destructive: "bg-destructive/10 text-destructive",
-} as const;
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: keyof typeof statToneClass;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-start justify-between gap-3 p-5">
-        <div className="min-w-0 space-y-1.5">
-          <p className="truncate text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-2xl font-semibold leading-tight tracking-tight text-foreground tabular-nums text-balance">{value}</p>
-          {sub ? <p className="truncate text-xs text-muted-foreground">{sub}</p> : null}
-        </div>
-        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", statToneClass[tone])}>
-          <Icon className="size-5" />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

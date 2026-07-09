@@ -80,6 +80,7 @@ def list_debts(
     page_size: int = Query(default=20, ge=1, le=200),
 ) -> PaginatedResponse[DebtOut]:
     company_id, store_filter = _resolve_scope(current_user, store_id, db)
+    debt_service.refresh_overdue(db, company_id=company_id, store_id=store_filter)
     params = PageParams(page=page, page_size=page_size)
     items, total = debt_crud.list_for_scope(
         db,

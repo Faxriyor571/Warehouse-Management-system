@@ -18,7 +18,7 @@ from app.crud.store import store as store_crud
 from app.models.enums import UserRole
 from app.models.user import User
 from app.schemas.report import DebtReport, ExpenseReport, InventoryReport, SalesReport
-from app.services import report_service
+from app.services import debt_service, report_service
 from app.utils.exceptions import NotFoundError
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -71,6 +71,7 @@ def debt_report(
     store_id: int | None = Query(default=None, description="Faqat CEO uchun"),
 ) -> DebtReport:
     company_id, store_filter = _resolve_scope(current_user, store_id, db)
+    debt_service.refresh_overdue(db, company_id=company_id, store_id=store_filter)
     return report_service.debt_report(db, company_id=company_id, store_id=store_filter)
 
 

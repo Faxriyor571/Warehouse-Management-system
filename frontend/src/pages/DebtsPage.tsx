@@ -1,23 +1,26 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Wallet } from "lucide-react";
 
-import { formatDate, formatMoney } from "@/lib/formatters";
+import { businessTodayISO, formatDate, formatMoney, formatNumber } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
 import { debtService } from "@/services/debt";
+import { reportService } from "@/services/report";
 import { storeService } from "@/services/store";
-import type { DebtListParams, DebtStatus } from "@/types/debt";
+import type { Debt, DebtListParams, DebtStatus } from "@/types/debt";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableCard } from "@/components/ui/table-card";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { SkeletonCard, TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
 
@@ -27,26 +30,30 @@ const statusOptions = [
   { label: "To'langan", value: "paid" },
 ];
 
-const statusLabels: Record<DebtStatus, string> = {
-  active: "Faol",
-  overdue: "Muddati o'tgan",
-  paid: "To'langan",
-};
-
-const statusVariant: Record<DebtStatus, "warning" | "danger" | "success"> = {
-  active: "warning",
-  overdue: "danger",
-  paid: "success",
-};
+// Red = overdue, yellow = due today, green = active/paid. "Due today" isn't
+// a stored status (the backend keeps status as active until the day after
+// due_date), so it's derived here from due_date instead of the raw status.
+function resolveBadge(debt: Debt): { variant: "danger" | "warning" | "success"; label: string } {
+  if (debt.status === "overdue") return { variant: "danger", label: "Muddati o'tgan" };
+  if (debt.status === "paid") return { variant: "success", label: "To'langan" };
+  if (debt.due_date === businessTodayISO()) return { variant: "warning", label: "Bugun muddati" };
+  return { variant: "success", label: "Faol" };
+}
 
 export default function DebtsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isCeo = user?.role === "ceo";
 
+  // Supports deep-linking from the Dashboard's overdue-debt alert
+  // (/debts?status=overdue) — read once as the initial value, not kept in
+  // sync afterward, so the in-page filter controls remain the source of
+  // truth once the user starts interacting with them.
+  const [searchParams] = useSearchParams();
+
   const [storeId, setStoreId] = React.useState("");
   const [customerId, setCustomerId] = React.useState("");
-  const [status, setStatus] = React.useState("");
+  const [status, setStatus] = React.useState(() => searchParams.get("status") ?? "");
   const [onlyOpen, setOnlyOpen] = React.useState(true);
   const [page, setPage] = React.useState(1);
 
@@ -66,6 +73,41 @@ export default function DebtsPage() {
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
   const customersQuery = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
 
+  // Debts page is the single source of truth for debt statistics (Dashboard
+  // only keeps a compact overdue alert). These follow the store filter but
+  // deliberately ignore status/customer/onlyOpen — they always show the
+  // full status breakdown, not a subset of it.
+  const summaryStoreId = storeId ? Number(storeId) : undefined;
+  const debtReportQuery = useQuery({
+    queryKey: ["reports", "debts", "summary", summaryStoreId],
+    queryFn: () => reportService.debts(summaryStoreId ? { store_id: summaryStoreId } : {}),
+  });
+  const dueTodayQuery = useQuery({
+    queryKey: ["debts", "due-today", summaryStoreId],
+    queryFn: () =>
+      debtService.list({
+        status: "active",
+        only_open: true,
+        due_before: businessTodayISO(),
+        due_after: businessTodayISO(),
+        ...(summaryStoreId ? { store_id: summaryStoreId } : {}),
+      }),
+  });
+  const paidCountQuery = useQuery({
+    queryKey: ["debts", "paid-count", summaryStoreId],
+    queryFn: () => debtService.list({ status: "paid", ...(summaryStoreId ? { store_id: summaryStoreId } : {}) }),
+  });
+
+  const activeBucket = debtReportQuery.data?.by_status.find((b) => b.status === "active");
+  const overdueBucket = debtReportQuery.data?.by_status.find((b) => b.status === "overdue");
+  const totalDebt = debtReportQuery.data?.total_remaining ?? "0";
+  const activeCount = activeBucket?.count ?? 0;
+  const overdueCount = overdueBucket?.count ?? 0;
+  const overdueTotal = overdueBucket?.remaining ?? "0";
+  const dueTodayCount = dueTodayQuery.data?.meta.total ?? 0;
+  const paidCount = paidCountQuery.data?.meta.total ?? 0;
+  const summaryLoading = debtReportQuery.isLoading || dueTodayQuery.isLoading || paidCountQuery.isLoading;
+
   const storeOptions = React.useMemo(
     () => (storesQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
     [storesQuery.data]
@@ -80,6 +122,26 @@ export default function DebtsPage() {
   return (
     <ContentContainer>
       <PageHeader title="Qarzlar" description="Mijozlarning ochiq va yopilgan qarzlari." />
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {summaryLoading ? (
+          Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : (
+          <>
+            <StatCard label="Jami qarz" icon={Wallet} tone="primary" value={formatMoney(totalDebt)} />
+            <StatCard
+              label="Muddati o'tgan"
+              icon={AlertTriangle}
+              tone="destructive"
+              value={formatNumber(overdueCount)}
+              sub={formatMoney(overdueTotal)}
+            />
+            <StatCard label="Bugun muddati" icon={CalendarClock} tone="warning" value={formatNumber(dueTodayCount)} />
+            <StatCard label="Faol qarzlar" icon={Clock} tone="success" value={formatNumber(activeCount)} />
+            <StatCard label="To'langan" icon={CheckCircle2} tone="success" value={formatNumber(paidCount)} />
+          </>
+        )}
+      </div>
 
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -141,9 +203,14 @@ export default function DebtsPage() {
                       <TableCell className="text-muted-foreground">{formatDate(debt.start_date)}</TableCell>
                       <TableCell className="text-muted-foreground">{debt.due_date ? formatDate(debt.due_date) : "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant[debt.status]} dot>
-                          {statusLabels[debt.status]}
-                        </Badge>
+                        {(() => {
+                          const badge = resolveBadge(debt);
+                          return (
+                            <Badge variant={badge.variant} dot>
+                              {badge.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{formatMoney(debt.amount)}</TableCell>
                       <TableCell className="text-right font-medium tabular-nums">{formatMoney(debt.remaining_amount)}</TableCell>

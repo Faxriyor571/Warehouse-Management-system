@@ -7,6 +7,8 @@ POST /debts remains legacy-admin-only (not in the API spec).
 """
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -323,3 +325,78 @@ def test_update_due_date_recomputes_overdue_status(client: TestClient, db_sessio
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "overdue"
     assert resp.json()["due_date"] == "2020-01-01"
+
+
+def test_stale_status_is_self_healed_on_read(client: TestClient, db_session: Session) -> None:
+    """A debt whose due date silently passes (no payment, no due-date edit)
+    must still surface as overdue the next time it's read — not stay
+    "active" forever because nothing happened to touch it. Simulated by
+    writing a past due_date directly to the DB (bypassing the status
+    recompute that a real API call would trigger), then confirming both
+    GET /debts and GET /reports/debts self-heal the stale status."""
+    ceo = _onboard(client, db_session, "db-m")
+    store_id = _store(client, ceo)
+    product_id = _product(client, ceo, "SKU-DBM")
+    client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "100", "price": "10.00"}]})
+    customer_id = _customer(client, ceo, "Mijoz")
+    sale = _debt_sale(client, ceo, db_session, "db-m", store_id, product_id, customer_id)
+    debt = _debt_for_sale(client, ceo, sale["id"])
+
+    from app.crud.debt import debt as debt_crud
+
+    row = debt_crud.get(db_session, debt["id"])
+    assert row is not None
+    row.due_date = date(2020, 1, 1)
+    db_session.add(row)
+    db_session.commit()
+    assert row.status.value == "active"  # still stale in the DB at this point
+
+    listed = client.get("/api/v1/debts", headers=ceo).json()["items"]
+    healed = next(d for d in listed if d["id"] == debt["id"])
+    assert healed["status"] == "overdue"
+
+    report = client.get("/api/v1/reports/debts", headers=ceo).json()
+    overdue_bucket = next((b for b in report["by_status"] if b["status"] == "overdue"), None)
+    assert overdue_bucket is not None and overdue_bucket["count"] >= 1
+
+
+def test_refresh_overdue_respects_company_scope(client: TestClient, db_session: Session) -> None:
+    """Reading company A's debts must not leak into flipping company B's
+    stale debts, and vice versa — the bulk UPDATE has to stay tenant-scoped."""
+    ceo_a = _onboard(client, db_session, "db-n1")
+    store_a = _store(client, ceo_a)
+    product_a = _product(client, ceo_a, "SKU-DBN1")
+    client.post("/api/v1/stock-in", headers=ceo_a, json={"store_id": store_a, "items": [{"product_id": product_a, "quantity": "100", "price": "10.00"}]})
+    customer_a = _customer(client, ceo_a, "Mijoz A")
+    sale_a = _debt_sale(client, ceo_a, db_session, "db-n1", store_a, product_a, customer_a)
+    debt_a = _debt_for_sale(client, ceo_a, sale_a["id"])
+
+    ceo_b = _onboard(client, db_session, "db-n2")
+    store_b = _store(client, ceo_b)
+    product_b = _product(client, ceo_b, "SKU-DBN2")
+    client.post("/api/v1/stock-in", headers=ceo_b, json={"store_id": store_b, "items": [{"product_id": product_b, "quantity": "100", "price": "10.00"}]})
+    customer_b = _customer(client, ceo_b, "Mijoz B")
+    sale_b = _debt_sale(client, ceo_b, db_session, "db-n2", store_b, product_b, customer_b)
+    debt_b = _debt_for_sale(client, ceo_b, sale_b["id"])
+
+    from app.crud.debt import debt as debt_crud
+
+    for debt in (debt_a, debt_b):
+        row = debt_crud.get(db_session, debt["id"])
+        assert row is not None
+        row.due_date = date(2020, 1, 1)
+        db_session.add(row)
+    db_session.commit()
+
+    # Reading company A's debts flips only A's stale debt. Each client.get()
+    # runs against its own DB session (see conftest's per-request override),
+    # so db_session's identity-map cache must be expired to see those writes.
+    client.get("/api/v1/debts", headers=ceo_a)
+    db_session.expire_all()
+    assert debt_crud.get(db_session, debt_a["id"]).status.value == "overdue"
+    assert debt_crud.get(db_session, debt_b["id"]).status.value == "active"
+
+    # Reading company B's debts now flips B's too.
+    client.get("/api/v1/debts", headers=ceo_b)
+    db_session.expire_all()
+    assert debt_crud.get(db_session, debt_b["id"]).status.value == "overdue"

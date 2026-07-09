@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableCard } from "@/components/ui/table-card";
 import { TableSkeleton } from "@/components/ui/skeleton";
@@ -57,12 +58,17 @@ type CustomerFormValues = z.infer<typeof customerFormSchema>;
 
 type ModalState = "new" | Customer | null;
 
-const typeLabels: Record<string, string> = { individual: "Jismoniy shaxs", legal_entity: "Yuridik shaxs" };
+type CustomerTypeTab = "legal_entity" | "individual";
+const customerTypeTabs = [
+  { id: "legal_entity" as const, label: "Yuridik shaxslar" },
+  { id: "individual" as const, label: "Jismoniy shaxslar" },
+];
 
 export default function CustomersPage() {
   const { user } = useAuth();
   const isCeo = user?.role === "ceo" || user?.role == null;
   const queryClient = useQueryClient();
+  const [tab, setTab] = React.useState<CustomerTypeTab>("legal_entity");
   const [modalCustomer, setModalCustomer] = React.useState<ModalState>(null);
   const [deactivateTarget, setDeactivateTarget] = React.useState<Customer | null>(null);
 
@@ -87,9 +93,9 @@ export default function CustomersPage() {
         is_active: modalCustomer.is_active,
       });
     } else if (modalCustomer === "new") {
-      form.reset({ full_name: "", customer_type: "individual", phone: "", address: "", passport: "", description: "", is_active: true });
+      form.reset({ full_name: "", customer_type: tab, phone: "", address: "", passport: "", description: "", is_active: true });
     }
-  }, [modalCustomer, form]);
+  }, [modalCustomer, form, tab]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["customers"] });
 
@@ -129,7 +135,10 @@ export default function CustomersPage() {
   };
 
   const isEditing = modalCustomer !== null;
-  const customers = customersQuery.data ?? [];
+  // customer_type is nullable (legacy pre-migration customers, see
+  // models/customer.py) — bucketed under Individual, matching the form's
+  // own default, so they stay visible instead of disappearing from both tabs.
+  const customers = (customersQuery.data ?? []).filter((c) => (c.customer_type ?? "individual") === tab);
 
   return (
     <ContentContainer>
@@ -144,14 +153,16 @@ export default function CustomersPage() {
         }
       />
 
-      <TableCard className="mt-6">
+      <SegmentedTabs value={tab} onChange={setTab} options={customerTypeTabs} className="mt-6" />
+
+      <TableCard className="mt-4">
         {customersQuery.isError ? (
           <ErrorState error={customersQuery.error} onRetry={() => void customersQuery.refetch()} />
         ) : customersQuery.isLoading ? (
           <TableSkeleton />
         ) : customers.length === 0 ? (
           <EmptyState
-            title="Hozircha mijozlar yo'q"
+            title={tab === "legal_entity" ? "Hozircha yuridik shaxslar yo'q" : "Hozircha jismoniy shaxslar yo'q"}
             description="Boshlash uchun birinchi mijozingizni qo'shing."
             action={<Button size="sm" onClick={() => setModalCustomer("new")}>Yangi mijoz</Button>}
           />
@@ -161,7 +172,6 @@ export default function CustomersPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>F.I.Sh.</TableHead>
-                  <TableHead>Turi</TableHead>
                   <TableHead>Telefon</TableHead>
                   <TableHead>Holati</TableHead>
                   <TableHead className="text-right" />
@@ -171,9 +181,6 @@ export default function CustomersPage() {
                 {customers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.full_name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {customer.customer_type ? typeLabels[customer.customer_type] : "—"}
-                    </TableCell>
                     <TableCell className="text-muted-foreground">{customer.phone ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={customer.is_active ? "success" : "secondary"} dot>

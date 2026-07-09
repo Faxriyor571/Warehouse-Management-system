@@ -29,14 +29,11 @@ from app.permissions.constants import (
 
 logger = logging.getLogger("wms.init")
 
-# Default units: (name, short_name)
+# Default units: (name, short_name). Kept deliberately minimal — this ERP's
+# stock is only ever measured in kilograms or sacks.
 _DEFAULT_UNITS: list[tuple[str, str]] = [
-    ("Dona", "dona"),
     ("Kilogramm", "kg"),
-    ("Litr", "l"),
-    ("Quti", "quti"),
     ("Qop", "qop"),
-    ("Metr", "m"),
 ]
 
 

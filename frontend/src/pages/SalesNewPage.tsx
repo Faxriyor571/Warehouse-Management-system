@@ -41,17 +41,77 @@ const paymentLineSchema = z.object({
   note: z.string().optional(),
 });
 
-const saleFormSchema = z.object({
-  store_id: z.string().optional(),
-  customer_id: z.string().optional(),
-  date: z.string().optional(),
-  discount: z.coerce.number({ invalid_type_error: "Chegirma raqam bo'lishi kerak" }).nonnegative("0 yoki undan katta bo'lishi kerak"),
-  note: z.string().optional(),
-  due_date: z.string().optional(),
-  items: z.array(lineItemSchema).min(1, "Kamida bitta qator qo'shing"),
-  payments: z.array(paymentLineSchema),
-});
-type SaleFormSchemaValues = z.infer<typeof saleFormSchema>;
+const customerTypeOptions = [
+  { label: "Jismoniy shaxs", value: "individual" },
+  { label: "Yuridik shaxs (Kompaniya)", value: "legal_entity" },
+];
+
+// An item left without an explicit price uses the product's current sale
+// price (see lineItemSchema's price comment) — so "what will this line
+// actually cost" needs the product catalog, not just what's typed in the
+// price box, or a plain (very common) no-override line would be priced at 0
+// and the debt section below would never trigger. `price` here is the raw
+// react-hook-form watch() value, which is "" (not undefined) for a cleared
+// number input — unlike the Zod schema's preprocessed value — so both must
+// be treated as "no override".
+function effectivePrice(price: number | string | undefined, productId: string | undefined, priceByProductId: Record<string, number>): number {
+  if (price !== undefined && price !== null && price !== "") return Number(price) || 0;
+  return priceByProductId[productId ?? ""] ?? 0;
+}
+
+// Debt-owner fields are only meaningful once the sale actually leaves a
+// remaining balance — computed the same way as the on-screen "Qarzga
+// qoladi" total (items - discount - payments), then re-derived here since
+// superRefine only sees raw form values, not component state.
+function computeRemaining(
+  data: { items: { product_id?: string; quantity: number; price?: number; discount: number }[]; discount: number; payments: { amount: number }[] },
+  priceByProductId: Record<string, number>
+) {
+  const itemsSubtotal = data.items.reduce((sum, item) => {
+    const qty = Number(item?.quantity) || 0;
+    const price = effectivePrice(item?.price, item?.product_id, priceByProductId);
+    const discount = Number(item?.discount) || 0;
+    return sum + (qty * price - discount);
+  }, 0);
+  const total = Math.max(itemsSubtotal - (Number(data.discount) || 0), 0);
+  const paidTotal = data.payments.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0);
+  return Math.max(total - paidTotal, 0);
+}
+
+function buildSaleFormSchema(priceByProductId: Record<string, number>) {
+  return z
+    .object({
+      store_id: z.string().optional(),
+      customer_type: z.enum(["individual", "legal_entity"]),
+      customer_id: z.string().optional(),
+      debtor_full_name: z.string().optional(),
+      debtor_phone: z.string().optional(),
+      date: z.string().optional(),
+      discount: z.coerce.number({ invalid_type_error: "Chegirma raqam bo'lishi kerak" }).nonnegative("0 yoki undan katta bo'lishi kerak"),
+      note: z.string().optional(),
+      due_date: z.string().optional(),
+      items: z.array(lineItemSchema).min(1, "Kamida bitta qator qo'shing"),
+      payments: z.array(paymentLineSchema),
+    })
+    .superRefine((data, ctx) => {
+      // No remaining debt: no customer information is required at all — the
+      // sale can be completed immediately (business rule, see SalesNewPage
+      // debt-driven UX).
+      if (computeRemaining(data, priceByProductId) <= 0) return;
+
+      if (data.customer_type === "individual") {
+        if (!data.debtor_full_name || data.debtor_full_name.trim().length < 2) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["debtor_full_name"], message: "F.I.Sh. kamida 2 belgidan iborat bo'lishi kerak" });
+        }
+        if (!data.debtor_phone || data.debtor_phone.trim().length < 5) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["debtor_phone"], message: "Telefon raqami kiritilishi shart" });
+        }
+      } else if (!data.customer_id) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer_id"], message: "Kompaniyani tanlash shart" });
+      }
+    });
+}
+type SaleFormSchemaValues = z.infer<ReturnType<typeof buildSaleFormSchema>>;
 
 export default function SalesNewPage() {
   const navigate = useNavigate();
@@ -61,11 +121,26 @@ export default function SalesNewPage() {
   const isCeo = user?.role === "ceo";
   const queryClient = useQueryClient();
 
+  const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
+  const customersQuery = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
+  const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const paymentMethodsQuery = useQuery({ queryKey: ["payment-methods"], queryFn: paymentMethodService.list });
+
+  const productPriceById = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of productsQuery.data ?? []) map[String(p.id)] = Number(p.sale_price);
+    return map;
+  }, [productsQuery.data]);
+  const saleFormSchema = React.useMemo(() => buildSaleFormSchema(productPriceById), [productPriceById]);
+
   const form = useForm<SaleFormSchemaValues>({
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       store_id: "",
+      customer_type: "individual",
       customer_id: "",
+      debtor_full_name: "",
+      debtor_phone: "",
       date: "",
       discount: 0,
       note: "",
@@ -80,18 +155,20 @@ export default function SalesNewPage() {
   const watchedItems = form.watch("items");
   const watchedPayments = form.watch("payments");
   const watchedDiscount = form.watch("discount");
-
-  const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
-  const customersQuery = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
-  const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
-  const paymentMethodsQuery = useQuery({ queryKey: ["payment-methods"], queryFn: paymentMethodService.list });
+  const watchedCustomerType = form.watch("customer_type");
 
   const storeOptions = React.useMemo(
     () => (storesQuery.data ?? []).map((s) => ({ label: s.name, value: String(s.id) })),
     [storesQuery.data]
   );
-  const customerOptions = React.useMemo(
-    () => (customersQuery.data ?? []).map((c) => ({ label: c.full_name, value: String(c.id) })),
+  // Only legal-entity customers are selectable as a debt owner here — an
+  // individual debtor is created inline (see onSubmit) rather than picked
+  // from the list.
+  const legalEntityCustomerOptions = React.useMemo(
+    () =>
+      (customersQuery.data ?? [])
+        .filter((c) => c.customer_type === "legal_entity")
+        .map((c) => ({ label: c.full_name, value: String(c.id) })),
     [customersQuery.data]
   );
   const productOptions = React.useMemo(
@@ -102,6 +179,17 @@ export default function SalesNewPage() {
     () => (paymentMethodsQuery.data ?? []).filter((m) => m.is_active).map((m) => ({ label: m.name, value: String(m.id) })),
     [paymentMethodsQuery.data]
   );
+
+  const itemsSubtotal = watchedItems.reduce((sum, item) => {
+    const qty = Number(item?.quantity) || 0;
+    const price = effectivePrice(item?.price, item?.product_id, productPriceById);
+    const discount = Number(item?.discount) || 0;
+    return sum + (qty * price - discount);
+  }, 0);
+  const total = Math.max(itemsSubtotal - (Number(watchedDiscount) || 0), 0);
+  const paidTotal = watchedPayments.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0);
+  const remainingDebt = Math.max(total - paidTotal, 0);
+  const showDebtSection = remainingDebt > 0;
 
   const createMutation = useMutation({
     mutationFn: saleService.create,
@@ -114,22 +202,39 @@ export default function SalesNewPage() {
     onError: toastMutationError,
   });
 
-  const onSubmit = (values: SaleFormSchemaValues) => {
+  const onSubmit = async (values: SaleFormSchemaValues) => {
     if (isCeo && !values.store_id) {
       form.setError("store_id", { message: "Do'konni tanlash shart" });
       return;
     }
+
+    // Fully paid: no debt owner needed, whatever was left over from a
+    // previous customer-type toggle is discarded.
+    if (remainingDebt <= 0) {
+      createMutation.mutate({ ...values, customer_id: undefined });
+      return;
+    }
+
+    // A debt will result. An individual debtor doesn't get picked from a
+    // list — they're created inline via the existing customer endpoint,
+    // then attached to the sale.
+    if (values.customer_type === "individual") {
+      try {
+        const customer = await customerService.create({
+          full_name: values.debtor_full_name,
+          customer_type: "individual",
+          phone: values.debtor_phone,
+          is_active: true,
+        });
+        createMutation.mutate({ ...values, customer_id: String(customer.id) });
+      } catch (err) {
+        toastMutationError(err);
+      }
+      return;
+    }
+
     createMutation.mutate(values);
   };
-
-  const itemsSubtotal = watchedItems.reduce((sum, item) => {
-    const qty = Number(item?.quantity) || 0;
-    const price = Number(item?.price) || 0;
-    const discount = Number(item?.discount) || 0;
-    return sum + (qty * price - discount);
-  }, 0);
-  const total = Math.max(itemsSubtotal - (Number(watchedDiscount) || 0), 0);
-  const paidTotal = watchedPayments.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0);
 
   return (
     <ContentContainer>
@@ -142,20 +247,17 @@ export default function SalesNewPage() {
               <Select id="sale-store" options={storeOptions} placeholder="Do'konni tanlang…" invalid={!!form.formState.errors.store_id} {...form.register("store_id")} />
             </FormField>
           ) : null}
-          <FormField htmlFor="sale-customer" label="Mijoz">
-            <Select id="sale-customer" options={customerOptions} placeholder="Mijozni tanlang…" {...form.register("customer_id")} />
+          <FormField htmlFor="sale-customer-type" label="Mijoz turi" required>
+            <Select id="sale-customer-type" options={customerTypeOptions} {...form.register("customer_type")} />
           </FormField>
           <FormField htmlFor="sale-date" label="Sana">
             <Input id="sale-date" type="datetime-local" {...form.register("date")} />
           </FormField>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField htmlFor="sale-discount" label="Hujjat chegirmasi">
             <Input id="sale-discount" type="number" step="0.01" {...form.register("discount")} />
-          </FormField>
-          <FormField htmlFor="sale-due-date" label="Qarz muddati">
-            <Input id="sale-due-date" type="date" {...form.register("due_date")} />
           </FormField>
           <FormField htmlFor="sale-note" label="Izoh">
             <Input id="sale-note" {...form.register("note")} />
@@ -184,7 +286,7 @@ export default function SalesNewPage() {
             {itemsArray.fields.map((field, index) => {
               const line = watchedItems[index];
               const qty = Number(line?.quantity) || 0;
-              const price = Number(line?.price) || 0;
+              const price = effectivePrice(line?.price, line?.product_id, productPriceById);
               const discount = Number(line?.discount) || 0;
               const subtotal = qty * price - discount;
               return (
@@ -269,10 +371,70 @@ export default function SalesNewPage() {
             </p>
             <p>
               <span className="text-muted-foreground">Qarzga qoladi: </span>
-              <span className="font-medium tabular-nums">{formatMoney(Math.max(total - paidTotal, 0))}</span>
+              <span className="font-medium tabular-nums">{formatMoney(remainingDebt)}</span>
             </p>
           </div>
         </div>
+
+        {showDebtSection ? (
+          <div className="space-y-4 rounded-xl border border-warning/40 bg-warning/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-foreground">Qarz ma'lumotlari</h2>
+              <p className="text-sm text-muted-foreground">
+                Qarzga qoladi: <span className="font-medium tabular-nums text-foreground">{formatMoney(remainingDebt)}</span>
+              </p>
+            </div>
+
+            {watchedCustomerType === "individual" ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  htmlFor="sale-debtor-name"
+                  label="F.I.Sh."
+                  required
+                  error={form.formState.errors.debtor_full_name?.message}
+                >
+                  <Input
+                    id="sale-debtor-name"
+                    invalid={!!form.formState.errors.debtor_full_name}
+                    {...form.register("debtor_full_name")}
+                  />
+                </FormField>
+                <FormField
+                  htmlFor="sale-debtor-phone"
+                  label="Telefon"
+                  required
+                  error={form.formState.errors.debtor_phone?.message}
+                >
+                  <Input
+                    id="sale-debtor-phone"
+                    placeholder="+998901234567"
+                    invalid={!!form.formState.errors.debtor_phone}
+                    {...form.register("debtor_phone")}
+                  />
+                </FormField>
+              </div>
+            ) : (
+              <FormField
+                htmlFor="sale-debt-customer"
+                label="Kompaniya"
+                required
+                error={form.formState.errors.customer_id?.message}
+              >
+                <Select
+                  id="sale-debt-customer"
+                  options={legalEntityCustomerOptions}
+                  placeholder="Kompaniyani tanlang…"
+                  invalid={!!form.formState.errors.customer_id}
+                  {...form.register("customer_id")}
+                />
+              </FormField>
+            )}
+
+            <FormField htmlFor="sale-due-date" label="Qarz muddati">
+              <Input id="sale-due-date" type="date" {...form.register("due_date")} />
+            </FormField>
+          </div>
+        ) : null}
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate("/sales")}>
