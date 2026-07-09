@@ -14,7 +14,7 @@ import { Building2, DollarSign, LogIn, PlusCircle, Receipt, ShoppingCart, Users 
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
 import { getErrorMessage } from "@/lib/http";
 import { useAuth } from "@/providers/auth-provider";
 import { companyService } from "@/services/company";
@@ -60,7 +60,7 @@ function TenantDashboard() {
         <ErrorState error={query.error} className="mt-6" onRetry={() => void query.refetch()} />
       ) : (
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {query.isLoading || !stats ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
@@ -110,7 +110,7 @@ function TenantDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={(stats.sales_chart ?? []).map((p) => ({ label: p.label, value: Number(p.value) }))}
-                      margin={{ left: -16, right: 8, top: 8 }}
+                      margin={{ left: 0, right: 8, top: 8 }}
                     >
                       <defs>
                         <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
@@ -120,7 +120,14 @@ function TenantDashboard() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                       <XAxis dataKey="label" tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        width={44}
+                        tickFormatter={(v: number) => formatCompactNumber(v)}
+                        className="text-xs"
+                        stroke="hsl(var(--muted-foreground))"
+                      />
                       <RechartsTooltip
                         cursor={{ stroke: "hsl(var(--primary))", strokeWidth: 1, strokeDasharray: "4 4" }}
                         contentStyle={{
@@ -131,7 +138,8 @@ function TenantDashboard() {
                           color: "hsl(var(--popover-foreground))",
                           boxShadow: "0 8px 24px -4px rgb(15 23 42 / 0.12)",
                         }}
-                        formatter={(value: number) => formatCurrency(value, CURRENCY)}
+                        labelFormatter={(label: string) => formatDate(label)}
+                        formatter={(value: number) => [formatCurrency(value, CURRENCY), "Savdo"]}
                       />
                       <Area
                         type="monotone"
@@ -400,11 +408,11 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-start justify-between gap-4 p-5">
+      <CardContent className="flex items-start justify-between gap-3 p-5">
         <div className="min-w-0 space-y-1.5">
           <p className="truncate text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-[26px] font-semibold leading-none tracking-tight text-foreground">{value}</p>
-          {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
+          <p className="text-2xl font-semibold leading-tight tracking-tight text-foreground tabular-nums text-balance">{value}</p>
+          {sub ? <p className="truncate text-xs text-muted-foreground">{sub}</p> : null}
         </div>
         <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", statToneClass[tone])}>
           <Icon className="size-5" />

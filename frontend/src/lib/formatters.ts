@@ -16,6 +16,14 @@ export function formatMoney(value: number | string | null | undefined): string {
   return formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Compact form for axis ticks / tight spaces — 300000 -> "300k", 5780120 -> "5.78m". */
+export function formatCompactNumber(value: number | string | null | undefined): string {
+  if (value == null) return "—";
+  const num = Number(value);
+  if (Number.isNaN(num)) return "—";
+  return new Intl.NumberFormat(DEFAULT_LOCALE, { notation: "compact", maximumFractionDigits: 1 }).format(num);
+}
+
 export function formatCurrency(
   value: number | string | null | undefined,
   currency: string = DEFAULT_CURRENCY
