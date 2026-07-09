@@ -10,6 +10,7 @@ import { useAuth } from "@/providers/auth-provider";
 const schema = z.object({
   username: z.string().min(1, "Foydalanuvchi nomi to'ldirilishi shart"),
   password: z.string().min(1, "Parol to'ldirilishi shart"),
+  companySlug: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -33,7 +34,7 @@ export default function LoginPage() {
     setSubmitError(null);
     setIsSubmitting(true);
     try {
-      await login(values.username, values.password);
+      await login(values.username, values.password, values.companySlug || undefined);
       navigate("/", { replace: true });
     } catch (error) {
       setSubmitError(getErrorMessage(error));
@@ -83,6 +84,20 @@ export default function LoginPage() {
             {errors.password ? (
               <p className="text-sm text-destructive">{errors.password.message}</p>
             ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="companySlug" className="text-sm font-medium">
+              Kompaniya identifikatori
+            </label>
+            <input
+              id="companySlug"
+              type="text"
+              autoComplete="organization"
+              placeholder="Faqat CEO/sotuvchi uchun, adminlar bo'sh qoldirsin"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+              {...register("companySlug")}
+            />
           </div>
 
           {submitError ? (
