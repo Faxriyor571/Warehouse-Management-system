@@ -7,6 +7,8 @@ that path is covered here and by the legacy test_stock_flow suite.
 """
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -84,6 +86,24 @@ def test_duplicate_name_within_company_rejected(client: TestClient, db_session: 
     client.post("/api/v1/categories", headers=ceo, json={"name": "Urug'lar"})
     dup = client.post("/api/v1/categories", headers=ceo, json={"name": "Urug'lar"})
     assert dup.status_code == 409
+
+
+def test_race_between_check_and_insert_returns_409_not_500(
+    client: TestClient, db_session: Session
+) -> None:
+    """Two requests racing past create_category's check-then-insert window
+    (e.g. a double form-submit) must both fail cleanly with 409 — not crash
+    with a raw 500 from the database's own unique constraint. Simulated by
+    patching the pre-check to always report "no existing row", so both
+    calls fall through to the real INSERT and the second one collides.
+    """
+    ceo = _onboard(client, db_session, "cat-race")
+    with patch("app.services.category_service.category_crud.get_by_name_for_company", return_value=None):
+        first = client.post("/api/v1/categories", headers=ceo, json={"name": "Race Condition"})
+        second = client.post("/api/v1/categories", headers=ceo, json={"name": "Race Condition"})
+    assert first.status_code == 201, first.text
+    assert second.status_code == 409, second.text
+    assert "detail" in second.json()
 
 
 def test_two_companies_share_category_name(client: TestClient, db_session: Session) -> None:
