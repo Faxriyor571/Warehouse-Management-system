@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -137,7 +137,7 @@ export default function SalesNewPage() {
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       store_id: "",
-      customer_type: "individual",
+      customer_type: "legal_entity",
       customer_id: "",
       debtor_full_name: "",
       debtor_phone: "",
@@ -197,6 +197,13 @@ export default function SalesNewPage() {
       toast.success(`${created.reference} raqamli savdo hujjati yaratildi.`);
       void queryClient.invalidateQueries({ queryKey: ["sales"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // A sale with a remaining balance creates a debt as a side effect —
+      // make sure the Debts page and every report reading debt data (both
+      // Dashboard's alert banner and Debts' own summary stats) refetch
+      // fresh rather than relying solely on staleTime:0 + unmount-on-
+      // navigate to eventually catch up.
+      void queryClient.invalidateQueries({ queryKey: ["debts"] });
+      void queryClient.invalidateQueries({ queryKey: ["reports"] });
       navigate(`/sales/${created.id}`);
     },
     onError: toastMutationError,
@@ -357,11 +364,7 @@ export default function SalesNewPage() {
             </Button>
           </div>
 
-          {paymentsArray.fields.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              To'lov qo'shilmasa, jami summa mijoz qarziga yoziladi.
-            </p>
-          ) : (
+          {paymentsArray.fields.length > 0 ? (
             <div className="space-y-3">
               {paymentsArray.fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-colors hover:border-primary/30 sm:grid-cols-[1fr_1fr_2fr_auto]">
@@ -380,7 +383,7 @@ export default function SalesNewPage() {
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
 
           <div className="flex justify-end gap-6 border-t border-border/70 pt-4 text-sm">
             <p>
@@ -396,11 +399,14 @@ export default function SalesNewPage() {
 
         {showDebtSection ? (
           <div className="space-y-4 rounded-xl border border-warning/40 bg-warning/5 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-foreground">Qarz ma'lumotlari</h2>
-              <p className="text-sm text-muted-foreground">
-                Qarzga qoladi: <span className="font-medium tabular-nums text-foreground">{formatMoney(remainingDebt)}</span>
-              </p>
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">Bu savdo qarz sifatida saqlanadi.</p>
+                <p className="text-sm text-muted-foreground">
+                  Qarzga qoladi: <span className="font-medium tabular-nums text-foreground">{formatMoney(remainingDebt)}</span>
+                </p>
+              </div>
             </div>
 
             {watchedCustomerType === "individual" ? (
