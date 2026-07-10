@@ -1,6 +1,5 @@
 /** Presentation formatters — pure functions for turning raw values into human-readable strings. */
 const DEFAULT_LOCALE = "uz-UZ";
-const DEFAULT_CURRENCY = "UZS";
 
 export function formatNumber(
   value: number | string | null | undefined,
@@ -12,26 +11,28 @@ export function formatNumber(
   return new Intl.NumberFormat(DEFAULT_LOCALE, options).format(num);
 }
 
+/**
+ * The one money formatter for the whole app: Uzbek so'm, thousands
+ * separated with a plain space, no decimals, "so'm" suffix — e.g.
+ * 1800 -> "1 800 so'm", 5780195.4 -> "5 780 195 so'm". Never shows a
+ * currency symbol or code ($, USD, UZS).
+ *
+ * Grouping is done manually rather than via Intl.NumberFormat's uz-UZ
+ * locale data: ICU's grouping separator for uz-UZ isn't guaranteed to be a
+ * plain U+0020 space across engines/versions (the same class of ICU gap
+ * documented on formatDate below, where uz-UZ month names silently fall
+ * back to a raw token) — so this avoids depending on it for an exact,
+ * byte-for-byte required format.
+ */
 export function formatMoney(value: number | string | null | undefined): string {
-  return formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/** Compact form for axis ticks / tight spaces — 300000 -> "300k", 5780120 -> "5.78m". */
-export function formatCompactNumber(value: number | string | null | undefined): string {
   if (value == null) return "—";
   const num = Number(value);
   if (Number.isNaN(num)) return "—";
-  return new Intl.NumberFormat(DEFAULT_LOCALE, { notation: "compact", maximumFractionDigits: 1 }).format(num);
-}
-
-export function formatCurrency(
-  value: number | string | null | undefined,
-  currency: string = DEFAULT_CURRENCY
-): string {
-  if (value == null) return "—";
-  const num = Number(value);
-  if (Number.isNaN(num)) return "—";
-  return new Intl.NumberFormat(DEFAULT_LOCALE, { style: "currency", currency }).format(num);
+  const rounded = Math.round(num);
+  const negative = rounded < 0;
+  const digits = String(Math.abs(rounded));
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${negative ? "-" : ""}${grouped} so'm`;
 }
 
 /**

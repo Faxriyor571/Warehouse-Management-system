@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatCompactNumber, formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
+import { formatDate, formatMoney, formatNumber } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { reportService } from "@/services/report";
 import { storeService } from "@/services/store";
@@ -24,8 +24,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-
-const CURRENCY = "UZS";
 
 type ReportTab = "sales" | "inventory" | "debts" | "expenses";
 
@@ -146,7 +144,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Jami daromad" value={formatCurrency(report.total_revenue, CURRENCY)} />
+        <StatCard label="Jami daromad" value={formatMoney(report.total_revenue)} />
         <StatCard label="Savdolar soni" value={formatNumber(report.total_count)} />
       </div>
 
@@ -170,7 +168,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => formatCompactNumber(v)} className="text-xs" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tickLine={false} axisLine={false} width={100} tickFormatter={(v: number) => formatMoney(v)} className="text-xs" stroke="hsl(var(--muted-foreground))" />
                   <RechartsTooltip
                     contentStyle={{
                       background: "hsl(var(--popover))",
@@ -180,7 +178,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
                       color: "hsl(var(--popover-foreground))",
                     }}
                     labelFormatter={(label: string) => formatDate(label)}
-                    formatter={(value: number) => [formatCurrency(value, CURRENCY), "Savdo"]}
+                    formatter={(value: number) => [formatMoney(value), "Savdo"]}
                   />
                   <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#fillReports)" />
                 </AreaChart>
@@ -211,7 +209,7 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
                   <TableRow key={row.status}>
                     <TableCell>{paymentStatusLabels[row.status] ?? row.status}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(row.count)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(row.revenue, CURRENCY)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatMoney(row.revenue)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -282,7 +280,7 @@ function DebtReportView({ params }: { params: { store_id?: number } }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Jami ochiq qarz" value={formatCurrency(report.total_remaining, CURRENCY)} />
+        <StatCard label="Jami ochiq qarz" value={formatMoney(report.total_remaining)} />
       </div>
 
       <Card>
@@ -306,7 +304,7 @@ function DebtReportView({ params }: { params: { store_id?: number } }) {
                   <TableRow key={row.status}>
                     <TableCell>{debtStatusLabels[row.status] ?? row.status}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(row.count)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(row.remaining, CURRENCY)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatMoney(row.remaining)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -334,7 +332,7 @@ function DebtReportView({ params }: { params: { store_id?: number } }) {
                 {report.by_customer.map((row) => (
                   <TableRow key={row.customer_id}>
                     <TableCell className="font-medium">{row.full_name}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(row.remaining, CURRENCY)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatMoney(row.remaining)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -358,7 +356,7 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Jami xarajat" value={formatCurrency(report.total, CURRENCY)} />
+        <StatCard label="Jami xarajat" value={formatMoney(report.total)} />
       </div>
 
       <Card>
@@ -380,7 +378,7 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} className="text-xs" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => formatCompactNumber(v)} className="text-xs" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tickLine={false} axisLine={false} width={100} tickFormatter={(v: number) => formatMoney(v)} className="text-xs" stroke="hsl(var(--muted-foreground))" />
                   <RechartsTooltip
                     contentStyle={{
                       background: "hsl(var(--popover))",
@@ -390,7 +388,7 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
                       color: "hsl(var(--popover-foreground))",
                     }}
                     labelFormatter={(label: string) => formatDate(label)}
-                    formatter={(value: number) => [formatCurrency(value, CURRENCY), "Xarajat"]}
+                    formatter={(value: number) => [formatMoney(value), "Xarajat"]}
                   />
                   <Area type="monotone" dataKey="value" stroke="hsl(var(--destructive))" strokeWidth={2} fill="url(#fillExpenses)" />
                 </AreaChart>
@@ -421,7 +419,7 @@ function ExpenseReportView({ params }: { params: { store_id?: number } }) {
                   <TableRow key={row.expense_type}>
                     <TableCell>{expenseTypeLabels[row.expense_type] ?? row.expense_type}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(row.count)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(row.total, CURRENCY)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatMoney(row.total)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -14,7 +14,7 @@ import { AlertTriangle, Building2, DollarSign, LogIn, PlusCircle, Receipt, Shopp
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { formatCompactNumber, formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/formatters";
 import { getErrorMessage } from "@/lib/http";
 import { useAuth } from "@/providers/auth-provider";
 import { companyService } from "@/services/company";
@@ -30,8 +30,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
-
-const CURRENCY = "UZS";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -84,7 +82,7 @@ function TenantDashboard() {
               <AlertTriangle className="size-5 shrink-0 text-destructive" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-destructive">
-                  {formatNumber(overdueCount)} ta qarz muddati o'tgan — jami {formatCurrency(overdueTotal, CURRENCY)}
+                  {formatNumber(overdueCount)} ta qarz muddati o'tgan — jami {formatMoney(overdueTotal)}
                 </p>
                 <p className="text-xs text-destructive/80">Batafsil ko'rish uchun bosing.</p>
               </div>
@@ -100,26 +98,26 @@ function TenantDashboard() {
                   label="Bugungi savdolar"
                   icon={ShoppingCart}
                   tone="primary"
-                  value={formatCurrency(stats.today_sales_total, CURRENCY)}
+                  value={formatMoney(stats.today_sales_total)}
                   sub={`${formatNumber(stats.today_sales_count)} ta savdo`}
                 />
                 <StatCard
                   label="Oylik daromad"
                   icon={DollarSign}
                   tone="success"
-                  value={formatCurrency(stats.month_revenue, CURRENCY)}
+                  value={formatMoney(stats.month_revenue)}
                 />
                 <StatCard
                   label="Oylik xarajatlar"
                   icon={Receipt}
                   tone="warning"
-                  value={formatCurrency(stats.month_expenses, CURRENCY)}
+                  value={formatMoney(stats.month_expenses)}
                 />
                 <StatCard
                   label="Sof foyda"
                   icon={TrendingUp}
                   tone={netProfit >= 0 ? "success" : "destructive"}
-                  value={formatCurrency(netProfit, CURRENCY)}
+                  value={formatMoney(netProfit)}
                 />
               </>
             )}
@@ -153,8 +151,8 @@ function TenantDashboard() {
                       <YAxis
                         tickLine={false}
                         axisLine={false}
-                        width={44}
-                        tickFormatter={(v: number) => formatCompactNumber(v)}
+                        width={100}
+                        tickFormatter={(v: number) => formatMoney(v)}
                         className="text-xs"
                         stroke="hsl(var(--muted-foreground))"
                       />
@@ -169,7 +167,7 @@ function TenantDashboard() {
                           boxShadow: "0 8px 24px -4px rgb(15 23 42 / 0.12)",
                         }}
                         labelFormatter={(label: string) => formatDate(label)}
-                        formatter={(value: number) => [formatCurrency(value, CURRENCY), "Savdo"]}
+                        formatter={(value: number) => [formatMoney(value), "Savdo"]}
                       />
                       <Area
                         type="monotone"
@@ -212,7 +210,7 @@ function TenantDashboard() {
                           </div>
                         </div>
                         <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                          {formatCurrency(product.revenue, CURRENCY)}
+                          {formatMoney(product.revenue)}
                         </span>
                       </li>
                     ))}
@@ -243,7 +241,7 @@ function TenantDashboard() {
                           <p className="truncate text-sm font-medium text-foreground">{debtor.full_name}</p>
                         </div>
                         <span className="shrink-0 text-sm font-semibold tabular-nums text-destructive">
-                          {formatCurrency(debtor.remaining, CURRENCY)}
+                          {formatMoney(debtor.remaining)}
                         </span>
                       </li>
                     ))}
@@ -285,7 +283,7 @@ function TenantDashboard() {
                           <TableCell className="font-medium">{op.reference}</TableCell>
                           <TableCell className="text-muted-foreground">{formatDateTime(op.date)}</TableCell>
                           <TableCell className="text-right tabular-nums font-medium">
-                            {formatCurrency(op.amount, CURRENCY)}
+                            {formatMoney(op.amount)}
                           </TableCell>
                         </TableRow>
                       ))}
