@@ -10,10 +10,12 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatDate, formatMoney, formatNumber } from "@/lib/formatters";
+import { formatDate, formatMoney, formatNumber, formatQuantity } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
+import { productService } from "@/services/product";
 import { reportService } from "@/services/report";
 import { storeService } from "@/services/store";
+import type { Product } from "@/types/product";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -223,6 +225,14 @@ function SalesReportView({ params }: { params: { store_id?: number; date_from?: 
 
 function InventoryReportView({ params }: { params: { store_id?: number } }) {
   const query = useQuery({ queryKey: ["reports", "inventory", params], queryFn: () => reportService.inventory(params) });
+  // InventoryReportRow doesn't carry unit data server-side — cross-reference
+  // the product catalog (which does) by product_id.
+  const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const productById = React.useMemo(() => {
+    const map = new Map<number, Product>();
+    for (const p of productsQuery.data ?? []) map.set(p.id, p);
+    return map;
+  }, [productsQuery.data]);
 
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   if (query.isLoading || !query.data) return <Skeleton className="h-72 w-full" />;
@@ -256,7 +266,9 @@ function InventoryReportView({ params }: { params: { store_id?: number } }) {
                     <TableRow key={row.product_id}>
                       <TableCell className="font-medium">{row.name}</TableCell>
                       <TableCell className="text-muted-foreground">{row.sku}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatNumber(row.quantity)}</TableCell>
+                      <TableCell className="text-right tabular-nums whitespace-nowrap">
+                        {formatQuantity(row.quantity, productById.get(row.product_id)?.unit)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

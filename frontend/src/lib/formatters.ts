@@ -71,6 +71,33 @@ export function nowForDatetimeLocalInput(): string {
   return local.toISOString().slice(0, 16);
 }
 
+/**
+ * Display label for a unit of measure — capitalizes the seeded lowercase
+ * short_name ("kg" -> "Kg", "qop" -> "Qop") without hardcoding any specific
+ * unit. Falls back to "—" when the unit is missing or has a blank
+ * short_name, matching the app's other missing-data placeholders.
+ */
+export function formatUnitLabel(unit: { short_name: string } | null | undefined): string {
+  const raw = unit?.short_name?.trim();
+  if (!raw) return "—";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+/**
+ * Quantity + unit as one string, e.g. "180 Qop". Render with
+ * `whitespace-nowrap` (as other tabular-nums cells already do) so it never
+ * splits across a line inside a narrow table cell.
+ */
+export function formatQuantity(
+  quantity: number | string | null | undefined,
+  unit: { short_name: string } | null | undefined
+): string {
+  if (quantity == null) return "—";
+  const num = Number(quantity);
+  if (Number.isNaN(num)) return "—";
+  return `${formatNumber(quantity)} ${formatUnitLabel(unit)}`;
+}
+
 /** Up-to-two-letter initials from a full name, for avatar fallbacks. */
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

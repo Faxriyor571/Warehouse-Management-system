@@ -5,9 +5,11 @@ import { Printer, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { toastMutationError } from "@/lib/mutation";
-import { formatDateTime, formatMoney, formatNumber } from "@/lib/formatters";
+import { formatDateTime, formatMoney, formatQuantity } from "@/lib/formatters";
+import { productService } from "@/services/product";
 import { saleService } from "@/services/sale";
 import { storeService } from "@/services/store";
+import type { Product } from "@/types/product";
 import type { PaymentStatus, SalesReturnFormValues } from "@/types/sale";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -45,6 +47,14 @@ export default function SalesDetailPage() {
   const saleQuery = useQuery({ queryKey: ["sales", saleId], queryFn: () => saleService.get(saleId) });
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list });
   const returnsQuery = useQuery({ queryKey: ["sales", saleId, "returns"], queryFn: () => saleService.listReturns(saleId) });
+  // Sale items embed only ProductBrief (no unit) server-side — cross
+  // -reference the product catalog (which does carry unit) by product_id.
+  const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const productById = React.useMemo(() => {
+    const map = new Map<number, Product>();
+    for (const p of productsQuery.data ?? []) map.set(p.id, p);
+    return map;
+  }, [productsQuery.data]);
 
   const sale = saleQuery.data;
   const store = (storesQuery.data ?? []).find((s) => s.id === sale?.store_id);
@@ -145,7 +155,9 @@ export default function SalesDetailPage() {
                     {sale.items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>{item.product ? `${item.product.name} (${item.product.sku})` : `Mahsulot #${item.product_id}`}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatNumber(item.quantity)}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+                          {formatQuantity(item.quantity, productById.get(item.product_id)?.unit)}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">{formatMoney(item.price)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatMoney(item.discount)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatMoney(item.subtotal)}</TableCell>
@@ -264,7 +276,9 @@ export default function SalesDetailPage() {
                 <div key={item.id} className="grid grid-cols-[2fr_1fr] items-end gap-3 rounded-lg border p-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">{item.product ? `${item.product.name} (${item.product.sku})` : `Mahsulot #${item.product_id}`}</p>
-                    <p className="text-xs text-muted-foreground">Sotilgan: {formatNumber(item.quantity)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Sotilgan: {formatQuantity(item.quantity, productById.get(item.product_id)?.unit)}
+                    </p>
                   </div>
                   <FormField htmlFor={`return-qty-${item.id}`} label="Qaytarish miqdori">
                     <Input

@@ -7,7 +7,7 @@ import { Boxes, DollarSign, Pencil, Power, ShoppingCart, Wallet } from "lucide-r
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { businessTodayISO, formatDate, formatMoney } from "@/lib/formatters";
+import { businessTodayISO, formatDate, formatMoney, formatUnitLabel } from "@/lib/formatters";
 import { toastMutationError } from "@/lib/mutation";
 import { useAuth } from "@/providers/auth-provider";
 import { inventoryService } from "@/services/inventory";
@@ -227,7 +227,7 @@ export default function StoreDetailPage() {
                       <TableRow key={row.product_id}>
                         <TableCell className="font-medium">{row.product_name}</TableCell>
                         <TableCell className="text-right tabular-nums">{row.quantity}</TableCell>
-                        <TableCell className="text-muted-foreground">{product?.unit?.short_name ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{formatUnitLabel(product?.unit)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatMoney(value)}</TableCell>
                       </TableRow>
                     );

@@ -2,11 +2,12 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Layers } from "lucide-react";
 
-import { formatDateTime, formatNumber } from "@/lib/formatters";
+import { formatDateTime, formatQuantity } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { inventoryService } from "@/services/inventory";
 import { productService } from "@/services/product";
 import { storeService } from "@/services/store";
+import type { Product } from "@/types/product";
 import type { MovementListParams, MovementType, StoreStockListParams } from "@/types/inventory";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -103,6 +104,15 @@ function StoreStockView({ storeId }: { storeId?: number }) {
     queryFn: () => inventoryService.crossStore(crossStoreProduct!.id),
     enabled: crossStoreProduct !== null,
   });
+  // StoreStockRow/CrossStoreRow don't carry unit data server-side — cross
+  // -reference the product catalog (which does) by product_id instead of
+  // adding a backend field.
+  const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const productById = React.useMemo(() => {
+    const map = new Map<number, Product>();
+    for (const p of productsQuery.data ?? []) map.set(p.id, p);
+    return map;
+  }, [productsQuery.data]);
 
   const items = query.data?.items ?? [];
 
@@ -138,7 +148,9 @@ function StoreStockView({ storeId }: { storeId?: number }) {
                   <TableRow key={row.product_id}>
                     <TableCell className="font-medium">{row.product_name}</TableCell>
                     <TableCell className="text-muted-foreground">{row.sku}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(row.quantity)}</TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                      {formatQuantity(row.quantity, productById.get(row.product_id)?.unit)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
@@ -179,7 +191,9 @@ function StoreStockView({ storeId }: { storeId?: number }) {
               {(crossStoreQuery.data ?? []).map((row) => (
                 <TableRow key={row.store_id}>
                   <TableCell className="font-medium">{row.store_name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatNumber(row.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums whitespace-nowrap">
+                    {formatQuantity(row.quantity, productById.get(crossStoreProduct?.id ?? -1)?.unit)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -201,6 +215,11 @@ function MovementsView({ storeId }: { storeId?: number }) {
     () => (productsQuery.data ?? []).map((p) => ({ label: `${p.name} (${p.sku})`, value: String(p.id) })),
     [productsQuery.data]
   );
+  const productById = React.useMemo(() => {
+    const map = new Map<number, Product>();
+    for (const p of productsQuery.data ?? []) map.set(p.id, p);
+    return map;
+  }, [productsQuery.data]);
 
   const params: MovementListParams = {
     ...(storeId ? { store_id: storeId } : {}),
@@ -263,10 +282,10 @@ function MovementsView({ storeId }: { storeId?: number }) {
                       </Badge>
                     </TableCell>
                     <TableCell
-                      className={`text-right tabular-nums font-medium ${Number(movement.quantity_delta) < 0 ? "text-destructive" : "text-success"}`}
+                      className={`text-right tabular-nums whitespace-nowrap font-medium ${Number(movement.quantity_delta) < 0 ? "text-destructive" : "text-success"}`}
                     >
                       {Number(movement.quantity_delta) > 0 ? "+" : ""}
-                      {formatNumber(movement.quantity_delta)}
+                      {formatQuantity(movement.quantity_delta, productById.get(movement.product_id)?.unit)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {movementTypeLabels[movement.reference_type as MovementType] ?? movement.reference_type}

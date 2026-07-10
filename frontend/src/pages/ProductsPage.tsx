@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
-import { formatMoney } from "@/lib/formatters";
+import { formatMoney, formatUnitLabel } from "@/lib/formatters";
 import { useAuth } from "@/providers/auth-provider";
 import { categoryService } from "@/services/category";
 import { productService } from "@/services/product";
@@ -226,7 +226,7 @@ export default function ProductsPage() {
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="text-muted-foreground">{product.sku}</TableCell>
                     <TableCell className="text-muted-foreground">{product.category?.name ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{product.unit?.short_name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatUnitLabel(product.unit)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatMoney(product.sale_price)}</TableCell>
                     <TableCell>
                       <Badge variant={product.is_active ? "success" : "secondary"} dot>

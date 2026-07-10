@@ -1,10 +1,13 @@
+import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
 
-import { formatDateTime, formatMoney, formatNumber } from "@/lib/formatters";
+import { formatDateTime, formatMoney, formatQuantity } from "@/lib/formatters";
+import { productService } from "@/services/product";
 import { stockInService } from "@/services/stock-in";
 import { storeService } from "@/services/store";
+import type { Product } from "@/types/product";
 import { ContentContainer } from "@/components/layout/content-container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -20,6 +23,14 @@ export default function StockInDetailPage() {
 
   const stockInQuery = useQuery({ queryKey: ["stock-in", stockInId], queryFn: () => stockInService.get(stockInId) });
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list });
+  // Stock-in items embed only ProductBrief (no unit) server-side — cross
+  // -reference the product catalog (which does carry unit) by product_id.
+  const productsQuery = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const productById = React.useMemo(() => {
+    const map = new Map<number, Product>();
+    for (const p of productsQuery.data ?? []) map.set(p.id, p);
+    return map;
+  }, [productsQuery.data]);
 
   const doc = stockInQuery.data;
   const store = (storesQuery.data ?? []).find((s) => s.id === doc?.store_id);
@@ -77,7 +88,9 @@ export default function StockInDetailPage() {
                     {doc.items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>{item.product ? `${item.product.name} (${item.product.sku})` : `Mahsulot #${item.product_id}`}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatNumber(item.quantity)}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+                          {formatQuantity(item.quantity, productById.get(item.product_id)?.unit)}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">{formatMoney(item.price)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatMoney(item.subtotal)}</TableCell>
                       </TableRow>
