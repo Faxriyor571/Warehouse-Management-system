@@ -17,7 +17,7 @@ from app.auth import security
 from app.config import settings
 from app.crud.payment_method import payment_method as pm_crud
 from app.database import Base, SessionLocal, engine
-from app.models.enums import RoleName
+from app.models.enums import RoleName, UserRole
 from app.models.role import Permission, Role
 from app.models.unit import Unit
 from app.models.user import User
@@ -99,6 +99,56 @@ def seed_admin(db: Session, roles: dict[str, Role]) -> None:
     logger.info("Boshlang'ich admin foydalanuvchi yaratildi: %s", settings.first_admin_username)
 
 
+def seed_super_admin(db: Session) -> None:
+    """Idempotently seed the first multi-tenant System Owner (``role=super_admin``).
+
+    Entirely independent of ``seed_admin`` above — this is a different account
+    in a different (newer) authorization model, not an alternate view of the
+    legacy admin. It is opt-in: a no-op unless both ``FIRST_SUPER_ADMIN_USERNAME``
+    and ``FIRST_SUPER_ADMIN_PASSWORD`` are explicitly set, and it never mutates
+    or promotes the legacy admin — mapping one to the other is called out in
+    DATABASE_DESIGN.md as a manual business decision, not something this app
+    decides on its own.
+    """
+    username = settings.first_super_admin_username
+    password = settings.first_super_admin_password
+    if not username or not password:
+        return
+
+    # Super Admins share the same globally-unique, NULL-company username scope
+    # as the legacy admin (``uq_users_null_company_username``), so look up by
+    # that scope rather than username alone to avoid colliding with a
+    # company-scoped user of the same name.
+    existing = db.execute(
+        select(User).where(User.username == username, User.company_id.is_(None))
+    ).scalar_one_or_none()
+    if existing is not None:
+        if existing.role != UserRole.SUPER_ADMIN:
+            logger.warning(
+                "FIRST_SUPER_ADMIN_USERNAME '%s' already belongs to another "
+                "platform-level user (e.g. the legacy admin) — skipping System "
+                "Owner seed rather than modifying it. Choose a different "
+                "FIRST_SUPER_ADMIN_USERNAME to bootstrap a System Owner.",
+                username,
+            )
+        return
+
+    super_admin = User(
+        username=username,
+        full_name=settings.first_super_admin_fullname,
+        hashed_password=security.hash_password(password),
+        role=UserRole.SUPER_ADMIN,
+        company_id=None,
+        store_id=None,
+        role_id=None,
+        is_superuser=False,
+        is_active=True,
+    )
+    db.add(super_admin)
+    db.commit()
+    logger.info("Birinchi System Owner (Super Admin) yaratildi: %s", username)
+
+
 def seed_payment_methods(db: Session) -> None:
     """Seed the 5 system methods for the legacy single-tenant scope
     (``company_id=None``). Tenant companies get their own copy at onboarding
@@ -120,6 +170,7 @@ def seed_all(db: Session) -> None:
     permissions = seed_permissions(db)
     roles = seed_roles(db, permissions)
     seed_admin(db, roles)
+    seed_super_admin(db)
     seed_payment_methods(db)
     seed_units(db)
 

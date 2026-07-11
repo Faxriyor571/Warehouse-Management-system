@@ -1,8 +1,9 @@
 """Production startup validation tests (Production Fix 2).
 
 ``Settings`` raises at construction time when ``APP_ENV=production`` keeps any
-insecure default (SECRET_KEY, DEBUG, FIRST_ADMIN_PASSWORD, wildcard CORS),
-so a misconfigured production process fails fast instead of starting.
+insecure default (SECRET_KEY, DEBUG, FIRST_ADMIN_PASSWORD, wildcard CORS, or a
+partially/insecurely configured FIRST_SUPER_ADMIN_*), so a misconfigured
+production process fails fast instead of starting.
 """
 from __future__ import annotations
 
@@ -70,6 +71,58 @@ def test_production_reports_all_violations_together() -> None:
     message = str(exc_info.value)
     for keyword in ("SECRET_KEY", "DEBUG", "FIRST_ADMIN_PASSWORD", "CORS_ORIGINS"):
         assert keyword in message
+
+
+def test_production_accepts_secure_config_with_super_admin() -> None:
+    kwargs = {
+        **_SECURE_KWARGS,
+        "first_super_admin_username": "owner",
+        "first_super_admin_password": "Str0ng!OwnerPassword",
+    }
+    Settings(**kwargs)  # must not raise
+
+
+def test_production_accepts_unset_super_admin() -> None:
+    Settings(**_SECURE_KWARGS)  # first_super_admin_* left unset entirely — must not raise
+
+
+def test_production_rejects_super_admin_username_without_password() -> None:
+    kwargs = {**_SECURE_KWARGS, "first_super_admin_username": "owner"}
+    with pytest.raises(ValidationError, match="FIRST_SUPER_ADMIN_USERNAME and FIRST_SUPER_ADMIN_PASSWORD"):
+        Settings(**kwargs)
+
+
+def test_production_rejects_super_admin_password_without_username() -> None:
+    kwargs = {**_SECURE_KWARGS, "first_super_admin_password": "Str0ng!OwnerPassword"}
+    with pytest.raises(ValidationError, match="FIRST_SUPER_ADMIN_USERNAME and FIRST_SUPER_ADMIN_PASSWORD"):
+        Settings(**kwargs)
+
+
+def test_production_rejects_super_admin_default_admin_password() -> None:
+    kwargs = {
+        **_SECURE_KWARGS,
+        "first_super_admin_username": "owner",
+        "first_super_admin_password": "Admin12345!",
+    }
+    with pytest.raises(ValidationError, match="FIRST_SUPER_ADMIN_PASSWORD"):
+        Settings(**kwargs)
+
+
+def test_production_rejects_super_admin_username_matching_legacy_admin() -> None:
+    kwargs = {
+        **_SECURE_KWARGS,
+        "first_admin_username": "platform-admin",
+        "first_super_admin_username": "platform-admin",
+        "first_super_admin_password": "Str0ng!OwnerPassword",
+    }
+    with pytest.raises(ValidationError, match="FIRST_SUPER_ADMIN_USERNAME must differ"):
+        Settings(**kwargs)
+
+
+def test_development_allows_partial_super_admin_config() -> None:
+    # Dev stays lenient like every other insecure-default check; only
+    # production fails fast.
+    Settings(app_env="development", first_super_admin_username="owner")
 
 
 def test_cors_origin_list_wildcard() -> None:

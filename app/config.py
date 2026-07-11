@@ -63,9 +63,21 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = Field(default=5)
 
     # --- First admin (seed) ---
+    # This is the LEGACY single-tenant admin (``is_superuser=True``, ``role=None``)
+    # — a completely different identity from the multi-tenant System Owner below.
     first_admin_username: str = Field(default="admin")
     first_admin_password: str = Field(default=_DEFAULT_ADMIN_PASSWORD)
     first_admin_fullname: str = Field(default="Bosh Administrator")
+
+    # --- First System Owner / Super Admin (seed, optional) ---
+    # The multi-tenant ``role=super_admin`` identity (DATABASE_DESIGN.md §3.3),
+    # required to create/manage companies. Unlike the legacy admin above, this
+    # account is opt-in: leaving both unset (the default) skips seeding it
+    # entirely, since mapping the legacy admin to Super Admin is a business
+    # decision this app never makes automatically (see db_init.seed_super_admin).
+    first_super_admin_username: str | None = Field(default=None)
+    first_super_admin_password: str | None = Field(default=None)
+    first_super_admin_fullname: str = Field(default="Tizim Egasi")
 
     # ------------------------------------------------------------------
     # Derived / computed properties
@@ -130,6 +142,25 @@ class Settings(BaseSettings):
             errors.append("DEBUG must be false in production.")
         if self.first_admin_password == _DEFAULT_ADMIN_PASSWORD:
             errors.append("FIRST_ADMIN_PASSWORD must be changed from the default value.")
+        if self.first_super_admin_username or self.first_super_admin_password:
+            # Configuring the System Owner seed is optional (unset = skipped
+            # entirely), but a *partial* configuration is always a mistake —
+            # it would silently no-op (seed_super_admin requires both) while
+            # looking configured, so fail loud instead in production.
+            if not (self.first_super_admin_username and self.first_super_admin_password):
+                errors.append(
+                    "FIRST_SUPER_ADMIN_USERNAME and FIRST_SUPER_ADMIN_PASSWORD must both be "
+                    "set together (or both left unset to skip System Owner seeding)."
+                )
+            elif self.first_super_admin_password == _DEFAULT_ADMIN_PASSWORD:
+                errors.append(
+                    "FIRST_SUPER_ADMIN_PASSWORD must not reuse the default insecure admin password."
+                )
+            elif self.first_super_admin_username == self.first_admin_username:
+                errors.append(
+                    "FIRST_SUPER_ADMIN_USERNAME must differ from FIRST_ADMIN_USERNAME "
+                    "(both are platform-level usernames and would collide)."
+                )
         if "*" in self.cors_origin_list:
             errors.append(
                 "CORS_ORIGINS must not include a wildcard '*' in production "
