@@ -1,18 +1,24 @@
 """Unit-of-measurement endpoints (part of the product catalogue).
 
-Company-scoped: writes are CEO-only, reads are CEO/Seller, Super Admin has no
-access. Authorization goes through the transitional catalogue dependencies in
-``app/auth/legacy_compat.py`` (which also admit the legacy single-tenant admin
-during migration). Scoping is uniform via ``current_user.company_id``.
+Company-scoped. No dedicated sidebar page exists for Units — it's purely an
+implementation detail of the Products form (unit dropdown + inline "add new
+unit"), so it's gated by the same ``Perm.PRODUCTS_VIEW``/``MANAGE`` as
+Products itself rather than its own permission pair. The legacy single-tenant
+admin bypasses via ``is_superuser`` inside ``require_perm``. Scoping is
+uniform via ``current_user.company_id``.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import DbSession
-from app.auth.legacy_compat import RequireCatalogueManage, RequireCatalogueRead
+from app.auth.permissions import require_perm
 from app.crud.unit import unit as unit_crud
 from app.models.unit import Unit
+from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import Message, PaginatedResponse
 from app.schemas.unit import UnitCreate, UnitOut, UnitUpdate
 from app.services import unit_service
@@ -20,6 +26,9 @@ from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/units", tags=["Units"])
+
+RequireCatalogueRead = Annotated[User, Depends(require_perm(Perm.PRODUCTS_VIEW))]
+RequireCatalogueManage = Annotated[User, Depends(require_perm(Perm.PRODUCTS_MANAGE))]
 
 
 @router.get("", response_model=PaginatedResponse[UnitOut], summary="Birliklar ro'yxati")

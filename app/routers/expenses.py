@@ -1,59 +1,36 @@
 """Expense endpoints (API_SPECIFICATION.md §12).
 
-Company/store scoped, same shape as Stock In. Writes and reads are available
-to CEO and Seller (a Seller is confined to their own store); the legacy
-single-tenant admin is admitted transitionally and operates in the NULL-company
-scope. Super Admin has no access. Immutable — no PUT/DELETE (§12 notes).
+Company/store scoped, same shape as Stock In, gated by ``Perm.EXPENSES_MANAGE``
+(view+manage combined — no split exists for Expenses today; granted to CEO
+and Accountant. A Cashier/Warehouse Employee has no access, matching the ERP
+role redesign). The legacy single-tenant admin bypasses via ``is_superuser``
+inside ``require_perm`` and operates in the NULL-company scope. Super Admin
+has no access. Immutable — no PUT/DELETE (§12 notes).
 """
 from __future__ import annotations
 
 from datetime import date as date_type
+from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import DbSession, ReqContext
-from app.auth.legacy_compat import RequireExpenseActor
+from app.auth.permissions import require_perm
 from app.crud.expense import expense as expense_crud
-from app.crud.store import store as store_crud
-from app.models.enums import ExpenseType, UserRole
+from app.models.enums import ExpenseType
 from app.models.expense import Expense
 from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import PaginatedResponse
 from app.schemas.expense import ExpenseCreate, ExpenseOut
 from app.services import expense_service
-from app.utils.exceptions import NotFoundError, ValidationError
+from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
+from app.utils.scope import resolve_scope
 
 router = APIRouter(prefix="/expenses", tags=["Expenses (Xarajatlar)"])
 
-
-def _resolve_write_scope(
-    current_user: User, body_store_id: int | None, db: DbSession
-) -> tuple[int | None, int | None]:
-    if current_user.role == UserRole.SELLER:
-        return current_user.company_id, current_user.store_id
-    if current_user.role == UserRole.CEO:
-        if body_store_id is None:
-            raise ValidationError("store_id majburiy (CEO uchun)")
-        store = store_crud.get_for_company(db, body_store_id, current_user.company_id)
-        if store is None:
-            raise NotFoundError(f"Do'kon (id={body_store_id}) topilmadi")
-        return current_user.company_id, body_store_id
-    return None, None  # legacy single-tenant admin
-
-
-def _resolve_read_scope(
-    current_user: User, requested_store_id: int | None, db: DbSession
-) -> tuple[int | None, int | None]:
-    if current_user.role == UserRole.SELLER:
-        return current_user.company_id, current_user.store_id
-    if current_user.role == UserRole.CEO:
-        if requested_store_id is not None:
-            store = store_crud.get_for_company(db, requested_store_id, current_user.company_id)
-            if store is None:
-                raise NotFoundError(f"Do'kon (id={requested_store_id}) topilmadi")
-        return current_user.company_id, requested_store_id
-    return None, None  # legacy single-tenant admin
+RequireExpenseActor = Annotated[User, Depends(require_perm(Perm.EXPENSES_MANAGE))]
 
 
 @router.post(
@@ -65,7 +42,7 @@ def _resolve_read_scope(
 def create_expense(
     db: DbSession, ctx: ReqContext, current_user: RequireExpenseActor, data: ExpenseCreate
 ) -> Expense:
-    company_id, store_id = _resolve_write_scope(current_user, data.store_id, db)
+    company_id, store_id = resolve_scope(current_user, data.store_id, db, require_store_id=True)
     return expense_service.create_expense(
         db,
         data,
@@ -88,7 +65,7 @@ def list_expenses(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
 ) -> PaginatedResponse[ExpenseOut]:
-    company_id, store_filter = _resolve_read_scope(current_user, store_id, db)
+    company_id, store_filter = resolve_scope(current_user, store_id, db)
     params = PageParams(page=page, page_size=page_size)
     items, total = expense_crud.list_for_scope(
         db,
@@ -104,7 +81,7 @@ def list_expenses(
 
 @router.get("/{expense_id}", response_model=ExpenseOut, summary="Xarajat ma'lumoti")
 def get_expense(db: DbSession, current_user: RequireExpenseActor, expense_id: int) -> Expense:
-    company_id, store_filter = _resolve_read_scope(current_user, None, db)
+    company_id, store_filter = resolve_scope(current_user, None, db)
     obj = expense_crud.get_for_scope(db, expense_id, company_id, store_id=store_filter)
     if obj is None:
         raise NotFoundError(f"Xarajat (id={expense_id}) topilmadi")

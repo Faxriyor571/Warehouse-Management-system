@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Layers } from "lucide-react";
 
 import { formatDateTime, formatQuantity } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { inventoryService } from "@/services/inventory";
 import { productService } from "@/services/product";
@@ -53,7 +54,9 @@ const movementTypeVariant: Record<MovementType, "success" | "danger" | "warning"
 
 export default function InventoryPage() {
   const { user } = useAuth();
-  const isCeo = user?.role === "ceo";
+  // Company-wide identities (CEO, Warehouse Employee) can filter by store —
+  // a Cashier/Accountant never reaches this page (no inventory.view).
+  const isCeo = isCompanyWide(user);
   const [tab, setTab] = React.useState<InventoryTab>("stock");
   const [storeId, setStoreId] = React.useState("");
 

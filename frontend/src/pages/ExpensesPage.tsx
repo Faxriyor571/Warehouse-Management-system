@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
 import { formatDate, formatMoney } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { expenseService } from "@/services/expense";
 import { storeService } from "@/services/store";
@@ -51,10 +52,12 @@ const expenseFormSchema = z.object({
 type ExpenseFormSchemaValues = z.infer<typeof expenseFormSchema>;
 
 export default function ExpensesPage() {
-  const { user } = useAuth();
-  // Only an actual CEO must supply store_id; the legacy single-tenant admin
+  const { user, hasPerm } = useAuth();
+  // Every identity that reaches this page (CEO, Accountant) is company-wide
+  // and must supply store_id explicitly; the legacy single-tenant admin
   // resolves to (None, None) and never needs a store (see Stock In).
-  const isCeo = user?.role === "ceo";
+  const isCeo = isCompanyWide(user);
+  const canCreate = hasPerm("expenses.manage");
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = React.useState(false);
 
@@ -118,10 +121,12 @@ export default function ExpensesPage() {
         title="Xarajatlar"
         description="Do'kon xarajatlari qaydi. Saqlangan xarajatlarni tahrirlab yoki o'chirib bo'lmaydi."
         actions={
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus />
-            Xarajat qo'shish
-          </Button>
+          canCreate ? (
+            <Button onClick={() => setModalOpen(true)}>
+              <Plus />
+              Xarajat qo'shish
+            </Button>
+          ) : undefined
         }
       />
 
@@ -156,7 +161,7 @@ export default function ExpensesPage() {
             <EmptyState
               title="Hozircha xarajatlar yo'q"
               description="Boshlash uchun birinchi xarajatingizni qo'shing."
-              action={<Button size="sm" onClick={() => setModalOpen(true)}>Xarajat qo'shish</Button>}
+              action={canCreate ? <Button size="sm" onClick={() => setModalOpen(true)}>Xarajat qo'shish</Button> : undefined}
             />
           ) : (
             <div className="overflow-x-auto">

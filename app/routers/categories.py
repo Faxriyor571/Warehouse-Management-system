@@ -1,20 +1,23 @@
 """Category endpoints (API_SPECIFICATION.md §5).
 
-Company-scoped catalogue: writes are CEO-only, reads are CEO/Seller, Super
-Admin has no access. Authorization goes through the transitional catalogue
-dependencies in ``app/auth/legacy_compat.py`` (which also admit the legacy
-single-tenant admin during migration). This router contains no legacy branch:
-scoping is uniform via ``current_user.company_id`` (NULL for the legacy admin,
-the company id for a CEO/Seller).
+Company-scoped catalogue, gated by ``Perm.CATEGORIES_VIEW``/``MANAGE`` (see
+``app/permissions/employee_matrix.py``) via ``require_perm``. The legacy
+single-tenant admin bypasses via ``is_superuser`` inside ``require_perm``
+itself. Scoping is uniform via ``current_user.company_id`` (NULL for the
+legacy admin, the company id for a CEO/Seller).
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import DbSession
-from app.auth.legacy_compat import RequireCatalogueManage, RequireCatalogueRead
+from app.auth.permissions import require_perm
 from app.crud.category import category as category_crud
 from app.models.category import Category
+from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.category import CategoryCreate, CategoryOut, CategoryUpdate
 from app.schemas.common import Message, PaginatedResponse
 from app.services import category_service
@@ -22,6 +25,9 @@ from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
+
+RequireCatalogueRead = Annotated[User, Depends(require_perm(Perm.CATEGORIES_VIEW))]
+RequireCatalogueManage = Annotated[User, Depends(require_perm(Perm.CATEGORIES_MANAGE))]
 
 
 @router.get("", response_model=PaginatedResponse[CategoryOut], summary="Kategoriyalar ro'yxati")

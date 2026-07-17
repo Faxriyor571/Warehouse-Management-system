@@ -72,6 +72,24 @@ def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, s
     return _bearer(client, username, "Sell12345!", company_slug=slug)
 
 
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    """A company-wide Warehouse Employee — the only job function that can
+    record a Stock In under the ERP role redesign (the Company Owner can see
+    this data but does not receive inventory themselves)."""
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={
+            "username": username,
+            "full_name": "Warehouse",
+            "password": "Wh12345!",
+            "employee_role": "warehouse",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
+
+
 def _product(client: TestClient, ceo: dict[str, str], sku: str) -> int:
     cat = client.post("/api/v1/categories", headers=ceo, json={"name": f"Cat-{sku}"}).json()["id"]
     unit = client.post("/api/v1/units", headers=ceo, json={"name": f"Unit-{sku}", "short_name": "u"}).json()["id"]
@@ -97,15 +115,21 @@ def _store_qty(client: TestClient, headers: dict[str, str], store_id: int | None
 
 # ---------------------------------------------------------------------------
 # Create — inventory effect
+#
+# Only a Warehouse Employee can record a Stock In under the ERP role redesign
+# (the Company Owner/CEO can view this data but does not receive inventory
+# themselves — enforced by Perm.STOCK_IN_MANAGE not being in CEO_PERMS). CEO
+# is still used below for setup (stores/products) and for read assertions.
 # ---------------------------------------------------------------------------
-def test_ceo_stock_in_increases_store_stock(client: TestClient, db_session: Session) -> None:
+def test_warehouse_stock_in_increases_store_stock(client: TestClient, db_session: Session) -> None:
     ceo = _onboard(client, db_session, "si-a")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-A")
+    warehouse = _warehouse(client, ceo, "si-a", "wh-si-a")
 
     resp = client.post(
         "/api/v1/stock-in",
-        headers=ceo,
+        headers=warehouse,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "100", "price": "12.00"}]},
     )
     assert resp.status_code == 201, resp.text
@@ -113,7 +137,7 @@ def test_ceo_stock_in_increases_store_stock(client: TestClient, db_session: Sess
     assert body["store_id"] == store_id
     assert float(body["total_amount"]) == 1200.0
 
-    # store_stock now reflects the receipt.
+    # store_stock now reflects the receipt (CEO can still read it).
     assert _store_qty(client, ceo, store_id, product_id) == 100.0
 
     # A stock_in movement is recorded in the ledger.
@@ -127,45 +151,44 @@ def test_two_stock_ins_accumulate(client: TestClient, db_session: Session) -> No
     ceo = _onboard(client, db_session, "si-b")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-B")
+    warehouse = _warehouse(client, ceo, "si-b", "wh-si-b")
 
     for qty in ("40", "60"):
         client.post(
             "/api/v1/stock-in",
-            headers=ceo,
+            headers=warehouse,
             json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": qty, "price": "10.00"}]},
         )
     assert _store_qty(client, ceo, store_id, product_id) == 100.0
 
 
-def test_seller_stock_in_uses_own_store(client: TestClient, db_session: Session) -> None:
-    ceo = _onboard(client, db_session, "si-c")
-    own = _store(client, ceo, "Own")
-    other = _store(client, ceo, "Other")
-    product_id = _product(client, ceo, "SKU-C")
-    seller = _seller(client, ceo, "si-c", "seller-si-c", own)
+def test_ceo_cannot_create_stock_in(client: TestClient, db_session: Session) -> None:
+    """The Company Owner can view Stock In documents but not create one —
+    that's a Warehouse Employee's job (ERP role redesign)."""
+    ceo = _onboard(client, db_session, "si-owner")
+    store_id = _store(client, ceo)
+    product_id = _product(client, ceo, "SKU-OWNER")
 
-    # Seller passes a foreign store_id in the body; it must be ignored — the
-    # receipt lands in the seller's own store.
     resp = client.post(
         "/api/v1/stock-in",
-        headers=seller,
-        json={"store_id": other, "items": [{"product_id": product_id, "quantity": "25", "price": "10.00"}]},
+        headers=ceo,
+        json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "25", "price": "10.00"}]},
     )
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["store_id"] == own
-    assert _store_qty(client, ceo, own, product_id) == 25.0
-    assert _store_qty(client, ceo, other, product_id) is None
+    assert resp.status_code == 403, resp.text
+    # But reading the (empty) list still works.
+    assert client.get("/api/v1/stock-in", headers=ceo).status_code == 200
 
 
 # ---------------------------------------------------------------------------
 # Validation / authorization
 # ---------------------------------------------------------------------------
-def test_ceo_missing_store_id_rejected(client: TestClient, db_session: Session) -> None:
+def test_warehouse_missing_store_id_rejected(client: TestClient, db_session: Session) -> None:
     ceo = _onboard(client, db_session, "si-d")
     product_id = _product(client, ceo, "SKU-D")
+    warehouse = _warehouse(client, ceo, "si-d", "wh-si-d")
     resp = client.post(
         "/api/v1/stock-in",
-        headers=ceo,
+        headers=warehouse,
         json={"items": [{"product_id": product_id, "quantity": "1", "price": "1.00"}]},
     )
     assert resp.status_code == 422
@@ -176,9 +199,10 @@ def test_foreign_store_rejected(client: TestClient, db_session: Session) -> None
     ceo_b = _onboard(client, db_session, "si-e2")
     store_b = _store(client, ceo_b)
     product_a = _product(client, ceo_a, "SKU-E")
+    warehouse_a = _warehouse(client, ceo_a, "si-e1", "wh-si-e1")
     resp = client.post(
         "/api/v1/stock-in",
-        headers=ceo_a,
+        headers=warehouse_a,
         json={"store_id": store_b, "items": [{"product_id": product_a, "quantity": "1", "price": "1.00"}]},
     )
     assert resp.status_code == 404
@@ -189,9 +213,10 @@ def test_foreign_product_rejected(client: TestClient, db_session: Session) -> No
     ceo_b = _onboard(client, db_session, "si-f2")
     store_a = _store(client, ceo_a)
     product_b = _product(client, ceo_b, "SKU-F")
+    warehouse_a = _warehouse(client, ceo_a, "si-f1", "wh-si-f1")
     resp = client.post(
         "/api/v1/stock-in",
-        headers=ceo_a,
+        headers=warehouse_a,
         json={"store_id": store_a, "items": [{"product_id": product_b, "quantity": "1", "price": "1.00"}]},
     )
     assert resp.status_code == 404
@@ -201,11 +226,12 @@ def test_empty_items_and_bad_quantity_rejected(client: TestClient, db_session: S
     ceo = _onboard(client, db_session, "si-g")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-G")
+    warehouse = _warehouse(client, ceo, "si-g", "wh-si-g")
 
-    assert client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": []}).status_code == 422
+    assert client.post("/api/v1/stock-in", headers=warehouse, json={"store_id": store_id, "items": []}).status_code == 422
     assert client.post(
         "/api/v1/stock-in",
-        headers=ceo,
+        headers=warehouse,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "0", "price": "1.00"}]},
     ).status_code == 422
 
@@ -225,9 +251,10 @@ def test_cross_company_detail_404(client: TestClient, db_session: Session) -> No
     ceo_b = _onboard(client, db_session, "si-i2")
     store_b = _store(client, ceo_b)
     product_b = _product(client, ceo_b, "SKU-I")
+    warehouse_b = _warehouse(client, ceo_b, "si-i2", "wh-si-i2")
     doc_b = client.post(
         "/api/v1/stock-in",
-        headers=ceo_b,
+        headers=warehouse_b,
         json={"store_id": store_b, "items": [{"product_id": product_b, "quantity": "5", "price": "1.00"}]},
     ).json()
 
@@ -243,9 +270,11 @@ def test_reference_numbering_per_company(client: TestClient, db_session: Session
     sb = _store(client, ceo_b)
     pa = _product(client, ceo_a, "SKU-JA")
     pb = _product(client, ceo_b, "SKU-JB")
+    warehouse_a = _warehouse(client, ceo_a, "si-j1", "wh-si-j1")
+    warehouse_b = _warehouse(client, ceo_b, "si-j2", "wh-si-j2")
 
-    ra = client.post("/api/v1/stock-in", headers=ceo_a, json={"store_id": sa, "items": [{"product_id": pa, "quantity": "1", "price": "1"}]}).json()
-    rb = client.post("/api/v1/stock-in", headers=ceo_b, json={"store_id": sb, "items": [{"product_id": pb, "quantity": "1", "price": "1"}]}).json()
+    ra = client.post("/api/v1/stock-in", headers=warehouse_a, json={"store_id": sa, "items": [{"product_id": pa, "quantity": "1", "price": "1"}]}).json()
+    rb = client.post("/api/v1/stock-in", headers=warehouse_b, json={"store_id": sb, "items": [{"product_id": pb, "quantity": "1", "price": "1"}]}).json()
     # Each company's first document numbers independently.
     assert ra["reference"] == rb["reference"]
 
@@ -255,8 +284,9 @@ def test_reconciliation_holds(client: TestClient, db_session: Session) -> None:
     ceo = _onboard(client, db_session, "si-k")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-K")
+    warehouse = _warehouse(client, ceo, "si-k", "wh-si-k")
     for qty in ("10", "5", "20"):
-        client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": qty, "price": "1"}]})
+        client.post("/api/v1/stock-in", headers=warehouse, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": qty, "price": "1"}]})
 
     balance = _store_qty(client, ceo, store_id, product_id)
     movements = client.get(f"/api/v1/inventory/movements?product_id={product_id}", headers=ceo).json()["items"]

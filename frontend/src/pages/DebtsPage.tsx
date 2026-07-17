@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Wallet } from "lucide-react";
 
 import { businessTodayISO, formatDate, formatMoney, formatNumber } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
 import { debtService } from "@/services/debt";
@@ -42,8 +43,11 @@ function resolveBadge(debt: Debt): { variant: "danger" | "warning" | "success"; 
 
 export default function DebtsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isCeo = user?.role === "ceo";
+  const { user, hasPerm } = useAuth();
+  // Company-wide identities (CEO, Accountant) can filter by store; a
+  // Cashier is confined to their own store.
+  const isCeo = isCompanyWide(user);
+  const canFilterByCustomer = hasPerm("customers.view");
 
   // Supports deep-linking from the Dashboard's overdue-debt alert
   // (/debts?status=overdue) — read once as the initial value, not kept in
@@ -71,7 +75,11 @@ export default function DebtsPage() {
 
   const debtsQuery = useQuery({ queryKey: ["debts", params], queryFn: () => debtService.list(params) });
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });
-  const customersQuery = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
+  const customersQuery = useQuery({
+    queryKey: ["customers"],
+    queryFn: customerService.list,
+    enabled: canFilterByCustomer,
+  });
 
   // Debts page is the single source of truth for debt statistics (Dashboard
   // only keeps a compact overdue alert). These follow the store filter but
@@ -145,13 +153,15 @@ export default function DebtsPage() {
 
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            options={customerOptions}
-            placeholder="Barcha mijozlar"
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            className="w-52"
-          />
+          {canFilterByCustomer ? (
+            <Select
+              options={customerOptions}
+              placeholder="Barcha mijozlar"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="w-52"
+            />
+          ) : null}
           <Select
             options={statusOptions}
             placeholder="Barcha holatlar"

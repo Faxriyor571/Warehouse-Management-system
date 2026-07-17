@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { authService } from "@/services/auth";
 import { companyService } from "@/services/company";
 import { tokenStorage } from "@/lib/token-storage";
+import { hasPerm, type Perm } from "@/lib/permissions";
 import type { User } from "@/types/auth";
 
 interface AuthContextValue {
@@ -16,6 +17,8 @@ interface AuthContextValue {
   enterSupportSession: (companyId: number) => Promise<void>;
   /** Return to the System Owner's own session from an active support session. */
   exitSupportSession: () => Promise<void>;
+  /** Whether the current user holds the given permission (see lib/permissions.ts). */
+  hasPerm: (perm: Perm) => boolean;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -85,9 +88,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(me);
   }, [queryClient]);
 
+  const checkPerm = React.useCallback((perm: Perm) => hasPerm(user, perm), [user]);
+
   const value = React.useMemo<AuthContextValue>(
-    () => ({ user, isAuthenticated: user !== null, isLoading, login, logout, enterSupportSession, exitSupportSession }),
-    [user, isLoading, login, logout, enterSupportSession, exitSupportSession]
+    () => ({
+      user,
+      isAuthenticated: user !== null,
+      isLoading,
+      login,
+      logout,
+      enterSupportSession,
+      exitSupportSession,
+      hasPerm: checkPerm,
+    }),
+    [user, isLoading, login, logout, enterSupportSession, exitSupportSession, checkPerm]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

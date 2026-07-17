@@ -1,5 +1,8 @@
 export type UserRole = "super_admin" | "ceo" | "seller";
 
+/** Job function within the SELLER tier — always null for CEO/SUPER_ADMIN. */
+export type EmployeeRole = "cashier" | "warehouse" | "accountant";
+
 export interface User {
   id: number;
   username: string;
@@ -10,6 +13,7 @@ export interface User {
   is_superuser: boolean;
   role_id: number | null;
   role: UserRole | null;
+  employee_role: EmployeeRole | null;
   company_id: number | null;
   store_id: number | null;
   last_login_at: string | null;

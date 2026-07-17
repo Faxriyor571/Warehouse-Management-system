@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { formatDate, formatMoney } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { stockInService } from "@/services/stock-in";
 import { storeService } from "@/services/store";
@@ -22,10 +23,11 @@ import { ErrorState } from "@/components/feedback/error-state";
 
 export default function StockInPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  // Only an actual CEO can filter by store — the legacy admin's reads
-  // resolve to (None, None) with no store scoping (see StockInNewPage).
-  const isCeo = user?.role === "ceo";
+  const { user, hasPerm } = useAuth();
+  // Company-wide identities (CEO, Warehouse Employee) can filter by store; a
+  // Cashier never reaches this page (no stock_in.view) so isn't a concern here.
+  const isCeo = isCompanyWide(user);
+  const canCreate = hasPerm("stock_in.manage");
 
   const [search, setSearch] = React.useState("");
   const [storeId, setStoreId] = React.useState("");
@@ -65,10 +67,12 @@ export default function StockInPage() {
         title="Kirim"
         description="Kirim hujjatlari. Hujjat yaratilganda ombordagi qoldiq avtomatik oshadi."
         actions={
-          <Button onClick={() => navigate("/stock-in/new")}>
-            <Plus />
-            Yangi kirim
-          </Button>
+          canCreate ? (
+            <Button onClick={() => navigate("/stock-in/new")}>
+              <Plus />
+              Yangi kirim
+            </Button>
+          ) : undefined
         }
       />
 
@@ -102,7 +106,7 @@ export default function StockInPage() {
             <EmptyState
               title="Hozircha kirim hujjatlari yo'q"
               description="Boshlash uchun birinchi kirim hujjatingizni yarating."
-              action={<Button size="sm" onClick={() => navigate("/stock-in/new")}>Yangi kirim</Button>}
+              action={canCreate ? <Button size="sm" onClick={() => navigate("/stock-in/new")}>Yangi kirim</Button> : undefined}
             />
           ) : (
             <div className="overflow-x-auto">

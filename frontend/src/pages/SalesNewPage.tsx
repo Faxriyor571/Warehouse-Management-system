@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
 import { formatMoney, nowForDatetimeLocalInput } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
 import { paymentMethodService } from "@/services/payment-method";
@@ -121,9 +122,11 @@ type SaleFormSchemaValues = z.infer<ReturnType<typeof buildSaleFormSchema>>;
 export default function SalesNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  // Only an actual CEO must supply store_id; the legacy single-tenant admin
-  // resolves to (None, None) and never needs a store (see Stock In).
-  const isCeo = user?.role === "ceo";
+  // A company-wide identity must supply store_id explicitly; the legacy
+  // single-tenant admin resolves to (None, None) and never needs a store
+  // (see Stock In). In practice only a Cashier submits this form (store-
+  // confined, so this rarely applies) — kept for defensive correctness.
+  const isCeo = isCompanyWide(user);
   const queryClient = useQueryClient();
 
   const storesQuery = useQuery({ queryKey: ["stores"], queryFn: storeService.list, enabled: isCeo });

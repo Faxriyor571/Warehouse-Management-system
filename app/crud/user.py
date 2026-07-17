@@ -73,11 +73,14 @@ class CRUDUser(CRUDBase[User]):
 
         The assigned store name is fetched in the same query via a join, so a
         page of Sellers costs one query regardless of how many stores the
-        company has (no per-row store lookups, no loading all stores).
+        company has (no per-row store lookups, no loading all stores). An
+        outer join (not inner) so a company-wide employee (Warehouse/
+        Accountant, ``store_id IS NULL``) still appears, with ``store_name``
+        resolving to ``None``.
         """
         base = (
             select(User, Store.name.label("store_name"))
-            .join(Store, User.store_id == Store.id)
+            .outerjoin(Store, User.store_id == Store.id)
             .where(
                 User.company_id == company_id,
                 User.role == UserRole.SELLER,

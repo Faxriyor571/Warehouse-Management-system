@@ -75,6 +75,8 @@ def _store(client: TestClient, ceo: dict[str, str], name: str = "Store") -> int:
 
 
 def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, store_id: int) -> dict[str, str]:
+    """Creates a Cashier (default employee_role) — the only job function
+    that can record a Sale under the ERP role redesign."""
     resp = client.post(
         "/api/v1/employees",
         headers=ceo,
@@ -82,6 +84,24 @@ def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, s
     )
     assert resp.status_code == 201, resp.text
     return _bearer(client, username, "Sell12345!", company_slug=slug)
+
+
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    """A company-wide Warehouse Employee — the only job function that can
+    record a Stock In under the ERP role redesign (the Company Owner can see
+    this data but does not receive inventory themselves)."""
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={
+            "username": username,
+            "full_name": "Warehouse",
+            "password": "Wh12345!",
+            "employee_role": "warehouse",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
 
 
 def _product(client: TestClient, ceo: dict[str, str], sku: str, sale_price: str = "15.00") -> int:
@@ -142,17 +162,24 @@ def _cash_method_id(db: Session, company_id: int) -> int:
 
 # ---------------------------------------------------------------------------
 # Create — inventory + payments/debt
+#
+# Only a Cashier can record a Sale, and only a Warehouse Employee can record
+# a Stock In, under the ERP role redesign (the Company Owner can view this
+# data but does not execute either operational workflow themselves). CEO is
+# still used below for setup (stores/products/customers) and read assertions.
 # ---------------------------------------------------------------------------
-def test_ceo_cash_sale_decreases_store_stock(client: TestClient, db_session: Session) -> None:
+def test_cashier_cash_sale_decreases_store_stock(client: TestClient, db_session: Session) -> None:
     ceo = _onboard(client, db_session, "sa-a")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SA")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-a", "wh-sa-a")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-a"))
+    cashier = _seller(client, ceo, "sa-a", "cashier-sa-a", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "items": [{"product_id": product_id, "quantity": "10"}],
@@ -171,17 +198,42 @@ def test_ceo_cash_sale_decreases_store_stock(client: TestClient, db_session: Ses
     assert float(sale_moves[0]["quantity_delta"]) == -10.0
 
 
-def test_partial_payment_creates_scoped_debt(client: TestClient, db_session: Session) -> None:
-    ceo = _onboard(client, db_session, "sa-b")
+def test_ceo_cannot_create_sale(client: TestClient, db_session: Session) -> None:
+    """The Company Owner can view Sales but not create one — that's a
+    Cashier's job (ERP role redesign)."""
+    ceo = _onboard(client, db_session, "sa-owner")
     store_id = _store(client, ceo)
-    product_id = _product(client, ceo, "SKU-SB")
-    _stock_in(client, ceo, store_id, product_id, "100")
-    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-b"))
-    customer_id = _customer(client, ceo, "Ali")
+    product_id = _product(client, ceo, "SKU-OWNER")
+    warehouse = _warehouse(client, ceo, "sa-owner", "wh-sa-owner")
+    _stock_in(client, warehouse, store_id, product_id, "100")
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-owner"))
 
     resp = client.post(
         "/api/v1/sales",
         headers=ceo,
+        json={
+            "store_id": store_id,
+            "items": [{"product_id": product_id, "quantity": "10"}],
+            "payments": [{"payment_method_id": cash_id, "amount": "150.00"}],
+        },
+    )
+    assert resp.status_code == 403, resp.text
+    assert client.get("/api/v1/sales", headers=ceo).status_code == 200
+
+
+def test_partial_payment_creates_scoped_debt(client: TestClient, db_session: Session) -> None:
+    ceo = _onboard(client, db_session, "sa-b")
+    store_id = _store(client, ceo)
+    product_id = _product(client, ceo, "SKU-SB")
+    warehouse = _warehouse(client, ceo, "sa-b", "wh-sa-b")
+    _stock_in(client, warehouse, store_id, product_id, "100")
+    cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-b"))
+    customer_id = _customer(client, ceo, "Ali")
+    cashier = _seller(client, ceo, "sa-b", "cashier-sa-b", store_id)
+
+    resp = client.post(
+        "/api/v1/sales",
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,
@@ -208,11 +260,13 @@ def test_no_payment_requires_customer_for_debt(client: TestClient, db_session: S
     ceo = _onboard(client, db_session, "sa-c")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SC")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-c", "wh-sa-c")
+    _stock_in(client, warehouse, store_id, product_id, "100")
+    cashier = _seller(client, ceo, "sa-c", "cashier-sa-c", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "5"}], "payments": []},
     )
     assert resp.status_code == 422, resp.text
@@ -222,10 +276,11 @@ def test_insufficient_stock_rejected(client: TestClient, db_session: Session) ->
     ceo = _onboard(client, db_session, "sa-d")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SD")
+    cashier = _seller(client, ceo, "sa-d", "cashier-sa-d", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "5"}], "payments": []},
     )
     assert resp.status_code == 422, resp.text
@@ -238,13 +293,15 @@ def test_price_override_allowed_for_legal_entity(client: TestClient, db_session:
     ceo = _onboard(client, db_session, "sa-e")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SE", sale_price="15.00")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-e", "wh-sa-e")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-e"))
     customer_id = _customer(client, ceo, "Yuridik", customer_type="legal_entity")
+    cashier = _seller(client, ceo, "sa-e", "cashier-sa-e", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,
@@ -260,13 +317,15 @@ def test_price_override_rejected_for_individual(client: TestClient, db_session: 
     ceo = _onboard(client, db_session, "sa-f")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SF", sale_price="15.00")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-f", "wh-sa-f")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-f"))
     customer_id = _customer(client, ceo, "Jismoniy", customer_type="individual")
+    cashier = _seller(client, ceo, "sa-f", "cashier-sa-f", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,
@@ -281,12 +340,14 @@ def test_price_override_rejected_without_customer(client: TestClient, db_session
     ceo = _onboard(client, db_session, "sa-g")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SG", sale_price="15.00")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-g", "wh-sa-g")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-g"))
+    cashier = _seller(client, ceo, "sa-g", "cashier-sa-g", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "items": [{"product_id": product_id, "quantity": "10", "price": "12.00"}],
@@ -304,8 +365,9 @@ def test_seller_sale_uses_own_store(client: TestClient, db_session: Session) -> 
     own = _store(client, ceo, "Own")
     other = _store(client, ceo, "Other")
     product_id = _product(client, ceo, "SKU-SH")
-    _stock_in(client, ceo, own, product_id, "50")
-    _stock_in(client, ceo, other, product_id, "50")
+    warehouse = _warehouse(client, ceo, "sa-h", "wh-sa-h")
+    _stock_in(client, warehouse, own, product_id, "50")
+    _stock_in(client, warehouse, other, product_id, "50")
     seller = _seller(client, ceo, "sa-h", "seller-sa-h", own)
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-h"))
 
@@ -336,11 +398,13 @@ def test_cross_company_detail_404(client: TestClient, db_session: Session) -> No
     ceo_b = _onboard(client, db_session, "sa-j2")
     store_b = _store(client, ceo_b)
     product_b = _product(client, ceo_b, "SKU-SJ")
-    _stock_in(client, ceo_b, store_b, product_b, "10")
+    warehouse_b = _warehouse(client, ceo_b, "sa-j2", "wh-sa-j2")
+    _stock_in(client, warehouse_b, store_b, product_b, "10")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-j2"))
+    cashier_b = _seller(client, ceo_b, "sa-j2", "cashier-sa-j2", store_b)
     sale_b = client.post(
         "/api/v1/sales",
-        headers=ceo_b,
+        headers=cashier_b,
         json={
             "store_id": store_b,
             "items": [{"product_id": product_b, "quantity": "1"}],
@@ -361,18 +425,21 @@ def test_reference_numbering_per_store_within_same_company(client: TestClient, d
     store_1 = _store(client, ceo, "S1")
     store_2 = _store(client, ceo, "S2")
     product_id = _product(client, ceo, "SKU-SK")
-    _stock_in(client, ceo, store_1, product_id, "10")
-    _stock_in(client, ceo, store_2, product_id, "10")
+    warehouse = _warehouse(client, ceo, "sa-k", "wh-sa-k")
+    _stock_in(client, warehouse, store_1, product_id, "10")
+    _stock_in(client, warehouse, store_2, product_id, "10")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-k"))
+    cashier_1 = _seller(client, ceo, "sa-k", "cashier-sa-k1", store_1)
+    cashier_2 = _seller(client, ceo, "sa-k", "cashier-sa-k2", store_2)
 
     r1 = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier_1,
         json={"store_id": store_1, "items": [{"product_id": product_id, "quantity": "1"}], "payments": [{"payment_method_id": cash_id, "amount": "15.00"}]},
     ).json()
     r2 = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier_2,
         json={"store_id": store_2, "items": [{"product_id": product_id, "quantity": "1"}], "payments": [{"payment_method_id": cash_id, "amount": "15.00"}]},
     ).json()
     # Each store's first sale numbers independently, even within one company.
@@ -383,12 +450,14 @@ def test_dual_mount_stock_out_and_sales_are_the_same_endpoint(client: TestClient
     ceo = _onboard(client, db_session, "sa-l")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SL")
-    _stock_in(client, ceo, store_id, product_id, "10")
+    warehouse = _warehouse(client, ceo, "sa-l", "wh-sa-l")
+    _stock_in(client, warehouse, store_id, product_id, "10")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-l"))
+    cashier = _seller(client, ceo, "sa-l", "cashier-sa-l", store_id)
 
     resp = client.post(
         "/api/v1/stock-out",
-        headers=ceo,
+        headers=cashier,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "1"}], "payments": [{"payment_method_id": cash_id, "amount": "15.00"}]},
     )
     assert resp.status_code == 201, resp.text
@@ -405,13 +474,15 @@ def test_sales_return_restores_inventory_and_reduces_debt(client: TestClient, db
     ceo = _onboard(client, db_session, "sa-m")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SM")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-m", "wh-sa-m")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-m"))
     customer_id = _customer(client, ceo, "Vali")
+    cashier = _seller(client, ceo, "sa-m", "cashier-sa-m", store_id)
 
     sale = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,
@@ -424,7 +495,7 @@ def test_sales_return_restores_inventory_and_reduces_debt(client: TestClient, db
     line_id = sale["items"][0]["id"]
     resp = client.post(
         f"/api/v1/sales/{sale['id']}/returns",
-        headers=ceo,
+        headers=cashier,
         json={"reason": "Nuqsonli", "items": [{"stock_out_item_id": line_id, "quantity": "4"}]},
     )
     assert resp.status_code == 201, resp.text
@@ -450,12 +521,14 @@ def test_sales_return_over_return_rejected(client: TestClient, db_session: Sessi
     ceo = _onboard(client, db_session, "sa-n")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SN")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-n", "wh-sa-n")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-n"))
+    cashier = _seller(client, ceo, "sa-n", "cashier-sa-n", store_id)
 
     sale = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "items": [{"product_id": product_id, "quantity": "10"}],
@@ -466,7 +539,7 @@ def test_sales_return_over_return_rejected(client: TestClient, db_session: Sessi
 
     resp = client.post(
         f"/api/v1/sales/{sale['id']}/returns",
-        headers=ceo,
+        headers=cashier,
         json={"items": [{"stock_out_item_id": line_id, "quantity": "11"}]},
     )
     assert resp.status_code == 422, resp.text
@@ -476,17 +549,19 @@ def test_sales_return_cross_sale_line_rejected(client: TestClient, db_session: S
     ceo = _onboard(client, db_session, "sa-o")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SO")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "sa-o", "wh-sa-o")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     cash_id = _cash_method_id(db_session, _company_id(db_session, "sa-o"))
+    cashier = _seller(client, ceo, "sa-o", "cashier-sa-o", store_id)
 
     sale_1 = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "5"}], "payments": [{"payment_method_id": cash_id, "amount": "75.00"}]},
     ).json()
     sale_2 = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "5"}], "payments": [{"payment_method_id": cash_id, "amount": "75.00"}]},
     ).json()
     sale_1_line_id = sale_1["items"][0]["id"]
@@ -494,7 +569,7 @@ def test_sales_return_cross_sale_line_rejected(client: TestClient, db_session: S
     # Returning sale_1's line against sale_2's document must fail.
     resp = client.post(
         f"/api/v1/sales/{sale_2['id']}/returns",
-        headers=ceo,
+        headers=cashier,
         json={"items": [{"stock_out_item_id": sale_1_line_id, "quantity": "1"}]},
     )
     assert resp.status_code == 404, resp.text

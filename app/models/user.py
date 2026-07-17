@@ -9,7 +9,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.enums import UserRole
+from app.models.enums import EmployeeRole, UserRole
 from app.models.mixins import SoftDeleteMixin, TimestampMixin
 
 if TYPE_CHECKING:
@@ -93,6 +93,12 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     )
     store_id: Mapped[int | None] = mapped_column(
         ForeignKey("stores.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    # Job function within the SELLER tier (cashier/warehouse/accountant) —
+    # always NULL for CEO/SUPER_ADMIN. See EmployeeRole's docstring for the
+    # extensibility rationale.
+    employee_role: Mapped[EmployeeRole | None] = mapped_column(
+        SAEnum(EmployeeRole, name="employee_role"), nullable=True, index=True
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

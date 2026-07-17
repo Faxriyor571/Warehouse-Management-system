@@ -50,8 +50,8 @@ type UnitFormValues = z.infer<typeof unitFormSchema>;
 type ModalState = "new" | Product | null;
 
 export default function ProductsPage() {
-  const { user } = useAuth();
-  const isCeo = user?.role === "ceo" || user?.role == null;
+  const { hasPerm } = useAuth();
+  const isCeo = hasPerm("products.manage");
   const queryClient = useQueryClient();
   const [modalProduct, setModalProduct] = React.useState<ModalState>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Product | null>(null);

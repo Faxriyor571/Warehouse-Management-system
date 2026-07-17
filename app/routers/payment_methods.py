@@ -1,23 +1,27 @@
 """Payment method endpoints.
 
 Company-scoped (DATABASE_DESIGN.md §3.18/§6). No dedicated
-API_SPECIFICATION.md section exists for this module; access mirrors Settings
-(CEO manages, company-scoped) since a Seller must still be able to read the
-list to pick a method at sale time. The legacy single-tenant admin is
-admitted transitionally and operates in the NULL-company scope. Super Admin
-has no access. System methods (``is_system=True``) can be neither deleted
-nor deactivated.
+API_SPECIFICATION.md section exists for this module; reading is gated by
+``Perm.PAYMENT_METHODS_VIEW`` (a Cashier must still be able to read the list
+to pick a method at sale time), writing by ``Perm.PAYMENT_METHODS_MANAGE``
+(CEO only, same as Settings). The legacy single-tenant admin bypasses via
+``is_superuser`` inside ``require_perm`` and operates in the NULL-company
+scope. Super Admin has no access. System methods (``is_system=True``) can be
+neither deleted nor deactivated.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, status
 
 from app.auth.dependencies import DbSession
-from app.auth.legacy_compat import RequirePaymentMethodManage, RequirePaymentMethodRead
+from app.auth.permissions import require_perm
 from app.crud.payment_method import payment_method as pm_crud
 from app.models.enums import UserRole
 from app.models.payment_method import PaymentMethod
 from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import Message
 from app.schemas.payment_method import (
     PaymentMethodCreate,
@@ -27,6 +31,9 @@ from app.schemas.payment_method import (
 from app.utils.exceptions import ConflictError, NotFoundError, ValidationError
 
 router = APIRouter(prefix="/payment-methods", tags=["Payment Methods"])
+
+RequirePaymentMethodRead = Annotated[User, Depends(require_perm(Perm.PAYMENT_METHODS_VIEW))]
+RequirePaymentMethodManage = Annotated[User, Depends(require_perm(Perm.PAYMENT_METHODS_MANAGE))]
 
 
 def _resolve_company(current_user: User) -> int | None:

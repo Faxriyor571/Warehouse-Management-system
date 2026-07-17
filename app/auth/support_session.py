@@ -28,7 +28,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.models.company import Company
-from app.models.enums import UserRole
+from app.models.enums import EmployeeRole, UserRole
 from app.models.user import User
 
 
@@ -55,6 +55,7 @@ class ActingUser:
         # service actually authorizes and scopes against.
         self.is_superuser = False
         self.role: UserRole | None = UserRole.CEO
+        self.employee_role: EmployeeRole | None = None
         self.company_id: int | None = company.id
         self.store_id: int | None = None
 

@@ -11,6 +11,7 @@ import {
 } from "recharts";
 
 import { formatDate, formatMoney, formatNumber, formatQuantity } from "@/lib/formatters";
+import { isCompanyWide, type Perm } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { productService } from "@/services/product";
 import { reportService } from "@/services/report";
@@ -29,11 +30,11 @@ import { ErrorState } from "@/components/feedback/error-state";
 
 type ReportTab = "sales" | "inventory" | "debts" | "expenses";
 
-const tabs: { id: ReportTab; label: string }[] = [
-  { id: "sales", label: "Savdo" },
-  { id: "inventory", label: "Ombor" },
-  { id: "debts", label: "Qarzlar" },
-  { id: "expenses", label: "Xarajatlar" },
+const tabs: { id: ReportTab; label: string; perm: Perm }[] = [
+  { id: "sales", label: "Savdo", perm: "reports.sales" },
+  { id: "inventory", label: "Ombor", perm: "reports.inventory" },
+  { id: "debts", label: "Qarzlar", perm: "reports.debts" },
+  { id: "expenses", label: "Xarajatlar", perm: "reports.expenses" },
 ];
 
 const paymentStatusLabels: Record<string, string> = {
@@ -55,9 +56,12 @@ const expenseTypeLabels: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const { user } = useAuth();
-  const isCeo = user?.role === "ceo";
-  const [tab, setTab] = React.useState<ReportTab>("sales");
+  const { user, hasPerm } = useAuth();
+  // Company-wide identities (CEO, Accountant) can filter by store; a
+  // Cashier never reaches this page at all (no reports.* perm).
+  const isCeo = isCompanyWide(user);
+  const visibleTabs = React.useMemo(() => tabs.filter((t) => hasPerm(t.perm)), [hasPerm]);
+  const [tab, setTab] = React.useState<ReportTab>(() => visibleTabs[0]?.id ?? "sales");
   const [storeId, setStoreId] = React.useState("");
   const [dateFrom, setDateFrom] = React.useState("");
   const [dateTo, setDateTo] = React.useState("");
@@ -75,7 +79,7 @@ export default function ReportsPage() {
       <PageHeader title="Hisobotlar" description="Savdo, ombor, qarz va xarajatlar bo'yicha umumiy ko'rinish." />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <SegmentedTabs value={tab} onChange={setTab} options={tabs} />
+        <SegmentedTabs value={tab} onChange={setTab} options={visibleTabs} />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {tab === "sales" ? (

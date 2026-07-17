@@ -60,6 +60,26 @@ def _store(client: TestClient, ceo: dict[str, str], name: str = "Store") -> int:
     return client.post("/api/v1/stores", headers=ceo, json={"name": name}).json()["id"]
 
 
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={"username": username, "full_name": "Warehouse", "password": "Wh12345!", "employee_role": "warehouse"},
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
+
+
+def _cashier(client: TestClient, ceo: dict[str, str], slug: str, username: str, store_id: int) -> dict[str, str]:
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={"username": username, "full_name": "Cashier", "password": "Cash12345!", "store_id": store_id},
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Cash12345!", company_slug=slug)
+
+
 def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, store_id: int) -> dict[str, str]:
     resp = client.post(
         "/api/v1/employees",
@@ -182,13 +202,15 @@ def test_sale_rejects_foreign_company_payment_method(client: TestClient, db_sess
         headers=ceo_a,
         json={"name": "P", "sku": "SKU-PMI", "category_id": cat, "unit_id": unit, "purchase_price": "10.00", "sale_price": "15.00"},
     ).json()
-    client.post("/api/v1/stock-in", headers=ceo_a, json={"store_id": store_a, "items": [{"product_id": product["id"], "quantity": "10", "price": "10.00"}]})
+    warehouse_a = _warehouse(client, ceo_a, "pm-i1", "wh-pm-i1")
+    client.post("/api/v1/stock-in", headers=warehouse_a, json={"store_id": store_a, "items": [{"product_id": product["id"], "quantity": "10", "price": "10.00"}]})
+    cashier_a = _cashier(client, ceo_a, "pm-i1", "cashier-pm-i1", store_a)
 
     cash_b = next(m for m in client.get("/api/v1/payment-methods", headers=ceo_b).json() if m["name"] == "Naqd")
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo_a,
+        headers=cashier_a,
         json={
             "store_id": store_a,
             "items": [{"product_id": product["id"], "quantity": "1"}],

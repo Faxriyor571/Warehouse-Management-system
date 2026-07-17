@@ -70,6 +70,23 @@ def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, s
     return _bearer(client, username, "Sell12345!", company_slug=slug)
 
 
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    """A company-wide Warehouse Employee — the only job function that can
+    record a Stock In under the ERP role redesign."""
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={
+            "username": username,
+            "full_name": "Warehouse",
+            "password": "Wh12345!",
+            "employee_role": "warehouse",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
+
+
 def _product(client: TestClient, ceo: dict[str, str], sku: str) -> int:
     cat = client.post("/api/v1/categories", headers=ceo, json={"name": f"Cat-{sku}"}).json()["id"]
     unit = client.post("/api/v1/units", headers=ceo, json={"name": f"Unit-{sku}", "short_name": "u"}).json()["id"]
@@ -121,10 +138,12 @@ def test_sales_report_totals_and_status_breakdown(client: TestClient, db_session
     ceo = _onboard(client, db_session, "rp-a")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-RPA")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "rp-a", "wh-rp-a")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     customer_id = client.post("/api/v1/customers", headers=ceo, json={"full_name": "Mijoz", "customer_type": "individual"}).json()["id"]
-    _sale(client, ceo, db_session, "rp-a", store_id, product_id, "2")  # paid 30
-    _sale(client, ceo, db_session, "rp-a", store_id, product_id, "10", customer_id=customer_id, paid="100.00")  # partial (150/100)
+    cashier = _seller(client, ceo, "rp-a", "cashier-rp-a", store_id)
+    _sale(client, cashier, db_session, "rp-a", store_id, product_id, "2")  # paid 30
+    _sale(client, cashier, db_session, "rp-a", store_id, product_id, "10", customer_id=customer_id, paid="100.00")  # partial (150/100)
 
     rep = client.get("/api/v1/reports/sales", headers=ceo).json()
     assert rep["total_count"] == 2
@@ -135,20 +154,15 @@ def test_sales_report_totals_and_status_breakdown(client: TestClient, db_session
     assert len(rep["by_day"]) >= 1
 
 
-def test_sales_report_seller_scoped(client: TestClient, db_session: Session) -> None:
+def test_cashier_has_no_sales_report_access(client: TestClient, db_session: Session) -> None:
+    """Reports is CEO-only under the ERP role redesign — a Cashier records
+    sales but does not see the Sales report (not in Perm.REPORTS_SALES'
+    grantees)."""
     ceo = _onboard(client, db_session, "rp-b")
     own = _store(client, ceo, "Own Store")
-    other = _store(client, ceo, "Other Store")
-    product_id = _product(client, ceo, "SKU-RPB")
-    _stock_in(client, ceo, own, product_id, "100")
-    _stock_in(client, ceo, other, product_id, "100")
-    _sale(client, ceo, db_session, "rp-b", own, product_id, "2")
-    _sale(client, ceo, db_session, "rp-b", other, product_id, "5")
-    seller = _seller(client, ceo, "rp-b", "seller-rp-b", own)
+    cashier = _seller(client, ceo, "rp-b", "cashier-rp-b", own)
 
-    rep = client.get("/api/v1/reports/sales", headers=seller).json()
-    assert rep["total_count"] == 1
-    assert float(rep["total_revenue"]) == 30.0
+    assert client.get("/api/v1/reports/sales", headers=cashier).status_code == 403
 
 
 def test_sales_report_ceo_store_filter_and_date_range(client: TestClient, db_session: Session) -> None:
@@ -156,10 +170,13 @@ def test_sales_report_ceo_store_filter_and_date_range(client: TestClient, db_ses
     store_a = _store(client, ceo, "Store A")
     store_b = _store(client, ceo, "Store B")
     product_id = _product(client, ceo, "SKU-RPC")
-    _stock_in(client, ceo, store_a, product_id, "100")
-    _stock_in(client, ceo, store_b, product_id, "100")
-    _sale(client, ceo, db_session, "rp-c", store_a, product_id, "2")
-    _sale(client, ceo, db_session, "rp-c", store_b, product_id, "3")
+    warehouse = _warehouse(client, ceo, "rp-c", "wh-rp-c")
+    _stock_in(client, warehouse, store_a, product_id, "100")
+    _stock_in(client, warehouse, store_b, product_id, "100")
+    cashier_a = _seller(client, ceo, "rp-c", "cashier-rp-c-a", store_a)
+    cashier_b = _seller(client, ceo, "rp-c", "cashier-rp-c-b", store_b)
+    _sale(client, cashier_a, db_session, "rp-c", store_a, product_id, "2")
+    _sale(client, cashier_b, db_session, "rp-c", store_b, product_id, "3")
 
     rep = client.get(f"/api/v1/reports/sales?store_id={store_a}", headers=ceo).json()
     assert rep["total_count"] == 1
@@ -176,7 +193,8 @@ def test_inventory_report_reflects_store_stock(client: TestClient, db_session: S
     ceo = _onboard(client, db_session, "rp-d")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-RPD")
-    _stock_in(client, ceo, store_id, product_id, "40")
+    warehouse = _warehouse(client, ceo, "rp-d", "wh-rp-d")
+    _stock_in(client, warehouse, store_id, product_id, "40")
 
     rep = client.get("/api/v1/reports/inventory", headers=ceo).json()
     assert rep["count"] == 1
@@ -185,18 +203,15 @@ def test_inventory_report_reflects_store_stock(client: TestClient, db_session: S
     assert float(row["quantity"]) == 40.0
 
 
-def test_inventory_report_seller_scoped(client: TestClient, db_session: Session) -> None:
+def test_warehouse_has_no_inventory_report_access(client: TestClient, db_session: Session) -> None:
+    """Reports is CEO-only under the ERP role redesign — a Warehouse
+    Employee moves stock but does not see the Inventory report (not in
+    Perm.REPORTS_INVENTORY's grantees; they see stock levels via the
+    Inventory module itself, a separate permission)."""
     ceo = _onboard(client, db_session, "rp-e")
-    own = _store(client, ceo, "Own Store")
-    other = _store(client, ceo, "Other Store")
-    product_id = _product(client, ceo, "SKU-RPE")
-    _stock_in(client, ceo, own, product_id, "10")
-    _stock_in(client, ceo, other, product_id, "99")
-    seller = _seller(client, ceo, "rp-e", "seller-rp-e", own)
+    warehouse = _warehouse(client, ceo, "rp-e", "wh-rp-e")
 
-    rep = client.get("/api/v1/reports/inventory", headers=seller).json()
-    assert rep["count"] == 1
-    assert float(rep["rows"][0]["quantity"]) == 10.0
+    assert client.get("/api/v1/reports/inventory", headers=warehouse).status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -206,9 +221,11 @@ def test_debt_report_groups_by_customer_and_status(client: TestClient, db_sessio
     ceo = _onboard(client, db_session, "rp-f")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-RPF")
-    _stock_in(client, ceo, store_id, product_id, "100")
+    warehouse = _warehouse(client, ceo, "rp-f", "wh-rp-f")
+    _stock_in(client, warehouse, store_id, product_id, "100")
     customer_id = client.post("/api/v1/customers", headers=ceo, json={"full_name": "Qarzdor", "customer_type": "individual"}).json()["id"]
-    _sale(client, ceo, db_session, "rp-f", store_id, product_id, "10", customer_id=customer_id, paid="100.00")  # 50 debt
+    cashier = _seller(client, ceo, "rp-f", "cashier-rp-f", store_id)
+    _sale(client, cashier, db_session, "rp-f", store_id, product_id, "10", customer_id=customer_id, paid="100.00")  # 50 debt
 
     rep = client.get("/api/v1/reports/debts", headers=ceo).json()
     assert float(rep["total_remaining"]) == 50.0
@@ -252,8 +269,10 @@ def test_cross_company_isolation(client: TestClient, db_session: Session) -> Non
     ceo_b = _onboard(client, db_session, "rp-i2")
     store_b = _store(client, ceo_b)
     product_b = _product(client, ceo_b, "SKU-RPI")
-    _stock_in(client, ceo_b, store_b, product_b, "50")
-    _sale(client, ceo_b, db_session, "rp-i2", store_b, product_b, "1")
+    warehouse_b = _warehouse(client, ceo_b, "rp-i2", "wh-rp-i2")
+    _stock_in(client, warehouse_b, store_b, product_b, "50")
+    cashier_b = _seller(client, ceo_b, "rp-i2", "cashier-rp-i2", store_b)
+    _sale(client, cashier_b, db_session, "rp-i2", store_b, product_b, "1")
 
     rep_a = client.get("/api/v1/reports/sales", headers=ceo_a).json()
     assert rep_a["total_count"] == 0

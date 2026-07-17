@@ -35,12 +35,12 @@ type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 type ModalState = "new" | Category | null;
 
 export default function CategoriesPage() {
-  const { user } = useAuth();
-  // Manage (create/update/delete) is CEO-only, or the legacy admin
-  // (role === null) — see require_catalogue_manage in
-  // app/auth/legacy_compat.py. A Seller has read-only access, same as
-  // Products.
-  const canManage = user?.role === "ceo" || user?.role == null;
+  const { hasPerm } = useAuth();
+  // Manage (create/update/delete) is CEO-only (or the legacy admin, via
+  // hasPerm's is_superuser bypass) — see Perm.CATEGORIES_MANAGE. A Cashier/
+  // Warehouse Employee has read-only access (an embedded dependency of
+  // Products), same as Products.
+  const canManage = hasPerm("categories.manage");
   const queryClient = useQueryClient();
   const [modalCategory, setModalCategory] = React.useState<ModalState>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Category | null>(null);

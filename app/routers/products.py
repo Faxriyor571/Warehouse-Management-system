@@ -1,8 +1,8 @@
 """Product catalogue endpoints (API_SPECIFICATION.md §6).
 
-Company-scoped: writes are CEO-only, reads are CEO/Seller, Super Admin has no
-access. Authorization goes through the transitional catalogue dependencies in
-``app/auth/legacy_compat.py``. Scoping is uniform via ``current_user.company_id``.
+Company-scoped, gated by ``Perm.PRODUCTS_VIEW``/``MANAGE``. The legacy
+single-tenant admin bypasses via ``is_superuser`` inside ``require_perm``.
+Scoping is uniform via ``current_user.company_id``.
 
 Per §6 this catalogue module deliberately does not define barcode-lookup or
 image-upload endpoints (SRS Future Roadmap), and per-store on-hand quantity is
@@ -10,12 +10,16 @@ an Inventory-phase concern.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import DbSession
-from app.auth.legacy_compat import RequireCatalogueManage, RequireCatalogueRead
+from app.auth.permissions import require_perm
 from app.crud.product import product as product_crud
 from app.models.product import Product
+from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import Message, PaginatedResponse
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.services import product_service
@@ -23,6 +27,9 @@ from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+RequireCatalogueRead = Annotated[User, Depends(require_perm(Perm.PRODUCTS_VIEW))]
+RequireCatalogueManage = Annotated[User, Depends(require_perm(Perm.PRODUCTS_MANAGE))]
 
 
 @router.get(

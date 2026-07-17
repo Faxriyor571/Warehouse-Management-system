@@ -3,7 +3,8 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Warehouse } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { navSections } from "@/config/navigation";
+import { navItems } from "@/config/navigation";
+import { hasAnyPerm, hasPerm } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { SupportSessionBanner } from "./support-session-banner";
 import { Topbar } from "./topbar";
@@ -13,16 +14,13 @@ export function AppShell() {
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
 
-  const visibleSections = navSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) =>
-        user?.role === "super_admin"
-          ? (item.roles?.includes("super_admin") ?? false)
-          : !item.roles || item.roles.includes(user?.role ?? null)
-      ),
-    }))
-    .filter((section) => section.items.length > 0);
+  const visibleItems = navItems.filter((item) => {
+    if (item.superAdminOnly) return user?.role === "super_admin";
+    if (user?.role === "super_admin") return false; // Super Admin sees only its own opt-in items.
+    if (item.strictCeoOnly) return user?.role === "ceo";
+    if (item.anyOfPerms) return hasAnyPerm(user, item.anyOfPerms);
+    return !item.perm || hasPerm(user, item.perm);
+  });
 
   React.useEffect(() => {
     setMobileNavOpen(false);
@@ -55,44 +53,35 @@ export function AppShell() {
 
         <nav
           aria-label="Asosiy"
-          className="scrollbar-thin flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-5"
+          className="scrollbar-thin flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-5"
         >
-          {visibleSections.map((section) => (
-            <div key={section.id} className="space-y-0.5">
-              {section.label ? (
-                <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                  {section.label}
-                </p>
-              ) : null}
-              {section.items.map((item) => (
-                <NavLink
-                  key={item.id}
-                  to={item.href}
-                  end={item.href === "/"}
-                  className={({ isActive }) =>
-                    cn(
-                      "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-all duration-150",
-                      isActive
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    )
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon
-                        className={cn(
-                          "size-[17px] shrink-0 transition-colors",
-                          isActive ? "text-primary-foreground" : "text-muted-foreground/80 group-hover:text-foreground"
-                        )}
-                        strokeWidth={2}
-                      />
-                      <span className="truncate">{item.title}</span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </div>
+          {visibleItems.map((item) => (
+            <NavLink
+              key={item.id}
+              to={item.href}
+              end={item.href === "/"}
+              className={({ isActive }) =>
+                cn(
+                  "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-all duration-150",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <item.icon
+                    className={cn(
+                      "size-[17px] shrink-0 transition-colors",
+                      isActive ? "text-primary-foreground" : "text-muted-foreground/80 group-hover:text-foreground"
+                    )}
+                    strokeWidth={2}
+                  />
+                  <span className="truncate">{item.title}</span>
+                </>
+              )}
+            </NavLink>
           ))}
         </nav>
       </aside>

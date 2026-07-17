@@ -75,6 +75,22 @@ class UserRole(str, enum.Enum):
     SELLER = "seller"
 
 
+class EmployeeRole(str, enum.Enum):
+    """Job function for a ``UserRole.SELLER`` employee.
+
+    Refines the fixed 3-tier ``UserRole`` hierarchy per DATABASE_DESIGN.md
+    §15's documented extensibility plan ("an optional overlay... layered on
+    top of the fixed role column") rather than growing ``UserRole`` itself.
+    Always ``None`` for CEO/SUPER_ADMIN. Adding a future job function (e.g. a
+    manager) means adding one value here plus one entry in
+    ``app/permissions/employee_matrix.py`` — nothing else changes.
+    """
+
+    CASHIER = "cashier"
+    WAREHOUSE = "warehouse"
+    ACCOUNTANT = "accountant"
+
+
 class CompanyStatus(str, enum.Enum):
     """Lifecycle status of a company (tenant)."""
 

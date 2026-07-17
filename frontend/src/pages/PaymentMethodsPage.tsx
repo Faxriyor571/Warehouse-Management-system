@@ -52,14 +52,12 @@ type FormValues = z.infer<typeof formSchema>;
 type ModalState = "new" | PaymentMethod | null;
 
 export default function PaymentMethodsPage() {
-  const { user } = useAuth();
-  // Manage (create/update/delete) is CEO-only, or the legacy admin
-  // (role === null) — see require_payment_method_manage in
-  // app/auth/legacy_compat.py. A Seller has read-only access (needed for
-  // the Sales payment picker), so this page is reachable for them via
-  // direct URL/sidebar, but write actions must be hidden, not just
-  // rejected server-side.
-  const canManage = user?.role === "ceo" || user?.role == null;
+  const { hasPerm } = useAuth();
+  // Manage (create/update/delete) is CEO-only (or the legacy admin, via
+  // hasPerm's is_superuser bypass) — see Perm.PAYMENT_METHODS_MANAGE. A
+  // Cashier only has payment_methods.view (needed for the Sales payment
+  // picker) and no longer sees this page in the sidebar at all.
+  const canManage = hasPerm("payment_methods.manage");
   const queryClient = useQueryClient();
   const [modalMethod, setModalMethod] = React.useState<ModalState>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<PaymentMethod | null>(null);

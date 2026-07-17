@@ -69,6 +69,24 @@ def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, s
     return _bearer(client, username, "Sell12345!", company_slug=slug)
 
 
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    """A company-wide Warehouse Employee — Suppliers ties to the Stock In
+    workflow under the ERP role redesign, so only Warehouse (not a plain
+    Cashier) can manage them."""
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={
+            "username": username,
+            "full_name": "Warehouse",
+            "password": "Wh12345!",
+            "employee_role": "warehouse",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
+
+
 def _product(client: TestClient, ceo: dict[str, str], sku: str) -> int:
     cat = client.post("/api/v1/categories", headers=ceo, json={"name": f"Cat-{sku}"}).json()["id"]
     unit = client.post("/api/v1/units", headers=ceo, json={"name": f"Unit-{sku}", "short_name": "u"}).json()["id"]
@@ -113,16 +131,24 @@ def test_ceo_updates_and_deletes_supplier(client: TestClient, db_session: Sessio
 
 
 # ---------------------------------------------------------------------------
-# Seller access (company-wide, same tier as CEO)
+# Warehouse Employee access (company-wide, same tier as CEO)
 # ---------------------------------------------------------------------------
-def test_seller_can_create_and_read_company_wide(client: TestClient, db_session: Session) -> None:
+def test_warehouse_can_create_and_read_company_wide(client: TestClient, db_session: Session) -> None:
     ceo = _onboard(client, db_session, "sup-c")
-    store_id = _store(client, ceo)
-    seller = _seller(client, ceo, "sup-c", "seller-sup-c", store_id)
+    warehouse = _warehouse(client, ceo, "sup-c", "wh-sup-c")
 
-    created = _supplier(client, seller, "Seller's Supplier")
+    created = _supplier(client, warehouse, "Warehouse's Supplier")
     # CEO sees the same company-wide supplier.
     assert client.get(f"/api/v1/suppliers/{created['id']}", headers=ceo).status_code == 200
+
+
+def test_cashier_has_no_supplier_access(client: TestClient, db_session: Session) -> None:
+    """A plain Cashier — unlike the old undifferentiated Seller — has no
+    Supplier access; Suppliers is a Warehouse Employee concern now."""
+    ceo = _onboard(client, db_session, "sup-cashier")
+    store_id = _store(client, ceo)
+    cashier = _seller(client, ceo, "sup-cashier", "cashier-sup", store_id)
+    assert client.get("/api/v1/suppliers", headers=cashier).status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -163,10 +189,11 @@ def test_stock_in_rejects_foreign_company_supplier(client: TestClient, db_sessio
     store_a = _store(client, ceo_a)
     product_a = _product(client, ceo_a, "SKU-SUPG")
     supplier_b = _supplier(client, ceo_b, "Foreign Supplier")
+    warehouse_a = _warehouse(client, ceo_a, "sup-g1", "wh-sup-g1")
 
     resp = client.post(
         "/api/v1/stock-in",
-        headers=ceo_a,
+        headers=warehouse_a,
         json={
             "store_id": store_a,
             "supplier_id": supplier_b["id"],
@@ -181,10 +208,11 @@ def test_stock_in_accepts_own_company_supplier(client: TestClient, db_session: S
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-SUPH")
     own_supplier = _supplier(client, ceo, "Own Supplier")
+    warehouse = _warehouse(client, ceo, "sup-h", "wh-sup-h")
 
     resp = client.post(
         "/api/v1/stock-in",
-        headers=ceo,
+        headers=warehouse,
         json={
             "store_id": store_id,
             "supplier_id": own_supplier["id"],

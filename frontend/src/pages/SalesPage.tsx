@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { formatDate, formatMoney } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { customerService } from "@/services/customer";
 import { saleService } from "@/services/sale";
@@ -42,10 +43,11 @@ const paymentStatusVariant: Record<PaymentStatus, "success" | "warning" | "dange
 
 export default function SalesPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  // Only an actual CEO can filter by store — the legacy admin's reads
-  // resolve to (None, None) with no store scoping (see Stock In).
-  const isCeo = user?.role === "ceo";
+  const { user, hasPerm } = useAuth();
+  // Company-wide identities (CEO) can filter by store; a Cashier is
+  // confined to their own store (see Stock In for the same split).
+  const isCeo = isCompanyWide(user);
+  const canCreate = hasPerm("sales.manage");
 
   const [search, setSearch] = React.useState("");
   const [storeId, setStoreId] = React.useState("");
@@ -90,10 +92,12 @@ export default function SalesPage() {
         title="Savdo"
         description="Savdo hujjatlari. Hujjat yaratilganda ombordagi qoldiq avtomatik kamayadi."
         actions={
-          <Button onClick={() => navigate("/sales/new")}>
-            <Plus />
-            Yangi savdo
-          </Button>
+          canCreate ? (
+            <Button onClick={() => navigate("/sales/new")}>
+              <Plus />
+              Yangi savdo
+            </Button>
+          ) : undefined
         }
       />
 
@@ -141,7 +145,7 @@ export default function SalesPage() {
             <EmptyState
               title="Hozircha savdo hujjatlari yo'q"
               description="Boshlash uchun birinchi savdo hujjatingizni yarating."
-              action={<Button size="sm" onClick={() => navigate("/sales/new")}>Yangi savdo</Button>}
+              action={canCreate ? <Button size="sm" onClick={() => navigate("/sales/new")}>Yangi savdo</Button> : undefined}
             />
           ) : (
             <div className="overflow-x-auto">

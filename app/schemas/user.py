@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.enums import UserRole
+from app.models.enums import EmployeeRole, UserRole
 from app.schemas.role import RoleSummary
 
 
@@ -73,6 +73,9 @@ class UserOut(UserBase):
     # Multi-tenant identity (DATABASE_DESIGN.md §3.3). Null until the user
     # has been migrated to / created under the new Companies/Employees flow.
     role: UserRole | None = None
+    # Job function within the SELLER tier (cashier/warehouse/accountant) —
+    # always None for CEO/SUPER_ADMIN. See EmployeeRole's docstring.
+    employee_role: EmployeeRole | None = None
     company_id: int | None = None
     store_id: int | None = None
     last_login_at: datetime | None = None

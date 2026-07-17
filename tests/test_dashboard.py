@@ -70,6 +70,27 @@ def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, s
     return _bearer(client, username, "Sell12345!", company_slug=slug)
 
 
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    """A company-wide Warehouse Employee — the only job function that can
+    record a Stock In under the ERP role redesign."""
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={"username": username, "full_name": "Warehouse", "password": "Wh12345!", "employee_role": "warehouse"},
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
+
+
+def _stock_in(client: TestClient, warehouse: dict[str, str], store_id: int, product_id: int, qty: str = "50") -> None:
+    resp = client.post(
+        "/api/v1/stock-in",
+        headers=warehouse,
+        json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": qty, "price": "10.00"}]},
+    )
+    assert resp.status_code == 201, resp.text
+
+
 def _product(client: TestClient, ceo: dict[str, str], sku: str) -> int:
     cat = client.post("/api/v1/categories", headers=ceo, json={"name": f"Cat-{sku}"}).json()["id"]
     unit = client.post("/api/v1/units", headers=ceo, json={"name": f"Unit-{sku}", "short_name": "u"}).json()["id"]
@@ -94,12 +115,14 @@ def _cash_method_id(db: Session, company_id: int) -> int:
     return method.id
 
 
-def _sale(client: TestClient, ceo: dict[str, str], db: Session, slug: str, store_id: int, product_id: int, qty: str) -> dict:
+def _sale(client: TestClient, actor: dict[str, str], db: Session, slug: str, store_id: int, product_id: int, qty: str) -> dict:
+    """``actor`` must be a Cashier (or the legacy admin) — the only identity
+    that can record a sale under the ERP role redesign."""
     company_id = _company_id(db, slug)
     cash_id = _cash_method_id(db, company_id)
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=actor,
         json={
             "store_id": store_id,
             "items": [{"product_id": product_id, "quantity": qty}],
@@ -143,10 +166,13 @@ def test_ceo_aggregates_company_wide_across_stores(client: TestClient, db_sessio
     store_a = _store(client, ceo, "Store A")
     store_b = _store(client, ceo, "Store B")
     product_id = _product(client, ceo, "SKU-DASH-D")
+    warehouse = _warehouse(client, ceo, "dash-d", "wh-dash-d")
     for store_id in (store_a, store_b):
-        client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
-    _sale(client, ceo, db_session, "dash-d", store_a, product_id, "2")
-    _sale(client, ceo, db_session, "dash-d", store_b, product_id, "3")
+        _stock_in(client, warehouse, store_id, product_id)
+    cashier_a = _seller(client, ceo, "dash-d", "cashier-dash-d-a", store_a)
+    cashier_b = _seller(client, ceo, "dash-d", "cashier-dash-d-b", store_b)
+    _sale(client, cashier_a, db_session, "dash-d", store_a, product_id, "2")
+    _sale(client, cashier_b, db_session, "dash-d", store_b, product_id, "3")
 
     stats = client.get("/api/v1/dashboard", headers=ceo).json()
     assert stats["today_sales_count"] == 2
@@ -158,11 +184,13 @@ def test_seller_sees_only_own_store(client: TestClient, db_session: Session) -> 
     own = _store(client, ceo, "Own Store")
     other = _store(client, ceo, "Other Store")
     product_id = _product(client, ceo, "SKU-DASH-E")
+    warehouse = _warehouse(client, ceo, "dash-e", "wh-dash-e")
     for store_id in (own, other):
-        client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
-    _sale(client, ceo, db_session, "dash-e", own, product_id, "2")
-    _sale(client, ceo, db_session, "dash-e", other, product_id, "5")
+        _stock_in(client, warehouse, store_id, product_id)
     seller = _seller(client, ceo, "dash-e", "seller-dash-e", own)
+    cashier_other = _seller(client, ceo, "dash-e", "cashier-dash-e-other", other)
+    _sale(client, seller, db_session, "dash-e", own, product_id, "2")
+    _sale(client, cashier_other, db_session, "dash-e", other, product_id, "5")
 
     stats = client.get("/api/v1/dashboard", headers=seller).json()
     assert stats["today_sales_count"] == 1
@@ -174,8 +202,10 @@ def test_cross_company_isolation(client: TestClient, db_session: Session) -> Non
     ceo_b = _onboard(client, db_session, "dash-f2")
     store_b = _store(client, ceo_b)
     product_b = _product(client, ceo_b, "SKU-DASH-F")
-    client.post("/api/v1/stock-in", headers=ceo_b, json={"store_id": store_b, "items": [{"product_id": product_b, "quantity": "50", "price": "10.00"}]})
-    _sale(client, ceo_b, db_session, "dash-f2", store_b, product_b, "1")
+    warehouse_b = _warehouse(client, ceo_b, "dash-f2", "wh-dash-f2")
+    _stock_in(client, warehouse_b, store_b, product_b)
+    cashier_b = _seller(client, ceo_b, "dash-f2", "cashier-dash-f2", store_b)
+    _sale(client, cashier_b, db_session, "dash-f2", store_b, product_b, "1")
 
     stats_a = client.get("/api/v1/dashboard", headers=ceo_a).json()
     assert stats_a["today_sales_count"] == 0
@@ -195,13 +225,15 @@ def test_top_debtors_and_debtor_totals(client: TestClient, db_session: Session) 
     ceo = _onboard(client, db_session, "dash-h")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-DASH-H")
-    client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
+    warehouse = _warehouse(client, ceo, "dash-h", "wh-dash-h")
+    _stock_in(client, warehouse, store_id, product_id)
     customer_id = client.post("/api/v1/customers", headers=ceo, json={"full_name": "Qarzdor", "customer_type": "individual"}).json()["id"]
     company_id = _company_id(db_session, "dash-h")
     cash_id = _cash_method_id(db_session, company_id)
+    cashier = _seller(client, ceo, "dash-h", "cashier-dash-h", store_id)
     client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,
@@ -222,8 +254,10 @@ def test_recent_operations_and_top_products_shape(client: TestClient, db_session
     ceo = _onboard(client, db_session, "dash-i")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "SKU-DASH-I")
-    client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
-    _sale(client, ceo, db_session, "dash-i", store_id, product_id, "4")
+    warehouse = _warehouse(client, ceo, "dash-i", "wh-dash-i")
+    _stock_in(client, warehouse, store_id, product_id)
+    cashier = _seller(client, ceo, "dash-i", "cashier-dash-i", store_id)
+    _sale(client, cashier, db_session, "dash-i", store_id, product_id, "4")
 
     stats = client.get("/api/v1/dashboard", headers=ceo).json()
     types = {op["type"] for op in stats["recent_operations"]}

@@ -95,19 +95,21 @@ def test_ceo_missing_store_id_rejected(client: TestClient, db_session: Session) 
     assert resp.status_code == 422
 
 
-def test_seller_store_id_auto_assigned_and_body_value_ignored(client: TestClient, db_session: Session) -> None:
+def test_cashier_has_no_expense_access(client: TestClient, db_session: Session) -> None:
+    """A plain Cashier — unlike the old undifferentiated Seller — has no
+    Expenses access at all under the ERP role redesign; only CEO and
+    Accountant manage company finances."""
     ceo = _onboard(client, db_session, "ex-c")
     own = _store(client, ceo, "Own")
-    other = _store(client, ceo, "Other")
-    seller = _seller(client, ceo, "ex-c", "seller-ex-c", own)
+    cashier = _seller(client, ceo, "ex-c", "cashier-ex-c", own)
 
     resp = client.post(
         "/api/v1/expenses",
-        headers=seller,
-        json={"store_id": other, "expense_type": "driver", "amount": "20000.00", "description": "Haydovchi"},
+        headers=cashier,
+        json={"expense_type": "driver", "amount": "20000.00", "description": "Haydovchi"},
     )
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["store_id"] == own
+    assert resp.status_code == 403, resp.text
+    assert client.get("/api/v1/expenses", headers=cashier).status_code == 403
 
 
 def test_foreign_store_rejected(client: TestClient, db_session: Session) -> None:
@@ -161,21 +163,34 @@ def test_invalid_expense_type_rejected(client: TestClient, db_session: Session) 
 # ---------------------------------------------------------------------------
 # Read scoping / financial-visibility rules
 # ---------------------------------------------------------------------------
-def test_seller_cannot_see_other_store_via_query_manipulation(client: TestClient, db_session: Session) -> None:
+def test_accountant_query_store_id_is_a_real_filter_not_confinement(client: TestClient, db_session: Session) -> None:
+    """Accountant is company-wide (unlike the old Seller model) — store_id
+    is a real, honored filter for them, same as for CEO, not an ignored
+    override of a fixed home store."""
     ceo = _onboard(client, db_session, "ex-h")
     own = _store(client, ceo, "Own")
     other = _store(client, ceo, "Other")
-    seller = _seller(client, ceo, "ex-h", "seller-ex-h", own)
+    # _seller() defaults to employee_role=cashier; create an accountant directly.
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={"username": "acct-ex-h", "full_name": "Accountant", "password": "Acc12345!", "employee_role": "accountant"},
+    )
+    assert resp.status_code == 201, resp.text
+    accountant = _bearer(client, "acct-ex-h", "Acc12345!", company_slug="ex-h")
 
     client.post("/api/v1/expenses", headers=ceo, json={"store_id": other, "expense_type": "fuel", "amount": "10.00", "description": "x"})
     own_expense = client.post(
-        "/api/v1/expenses", headers=seller, json={"expense_type": "fuel", "amount": "20.00", "description": "y"}
+        "/api/v1/expenses", headers=accountant, json={"store_id": own, "expense_type": "fuel", "amount": "20.00", "description": "y"}
     ).json()
 
-    # store_id query manipulation is ignored for a Seller — always own store.
-    listed = client.get(f"/api/v1/expenses?store_id={other}", headers=seller).json()
+    listed = client.get(f"/api/v1/expenses?store_id={other}", headers=accountant).json()
     assert listed["meta"]["total"] == 1
-    assert listed["items"][0]["id"] == own_expense["id"]
+    assert listed["items"][0]["description"] == "x"
+
+    listed_own = client.get(f"/api/v1/expenses?store_id={own}", headers=accountant).json()
+    assert listed_own["meta"]["total"] == 1
+    assert listed_own["items"][0]["id"] == own_expense["id"]
 
 
 def test_ceo_filters_by_store_id(client: TestClient, db_session: Session) -> None:

@@ -24,7 +24,7 @@ from app.utils.pagination import PageParams, make_meta
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
 
-def _to_out(seller: User, store_name: str) -> EmployeeOut:
+def _to_out(seller: User, store_name: str | None) -> EmployeeOut:
     return EmployeeOut(
         id=seller.id,
         username=seller.username,
@@ -32,7 +32,8 @@ def _to_out(seller: User, store_name: str) -> EmployeeOut:
         email=seller.email,
         phone=seller.phone,
         role=seller.role,  # type: ignore[arg-type]
-        store_id=seller.store_id,  # type: ignore[arg-type]
+        employee_role=seller.employee_role,  # type: ignore[arg-type]
+        store_id=seller.store_id,
         store_name=store_name,
         is_active=seller.is_active,
         last_login_at=seller.last_login_at,

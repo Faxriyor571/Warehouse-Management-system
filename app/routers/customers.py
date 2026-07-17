@@ -1,20 +1,25 @@
 """Customer / farmer endpoints (API_SPECIFICATION.md §10).
 
-Company-wide (no store scope): any Seller in the company can find/manage any
-company customer, but a Seller's debt/sales history view is filtered to their
-own store. The legacy single-tenant admin is admitted transitionally and
-operates in the NULL-company scope. Super Admin has no access.
+Company-wide (no store scope): whoever has ``Perm.CUSTOMERS_VIEW`` can
+find/manage any company customer (a Cashier's debt/sales history view is
+filtered to their own store); ``Perm.CUSTOMERS_MANAGE`` (deactivate) is
+CEO-only, unchanged from the legacy behavior. The legacy single-tenant admin
+bypasses via ``is_superuser`` inside ``require_perm`` and operates in the
+NULL-company scope. Super Admin has no access.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import DbSession, ReqContext
-from app.auth.legacy_compat import RequireCustomerActor, RequireCustomerManage
+from app.auth.permissions import require_perm
 from app.crud.customer import customer as customer_crud
 from app.models.customer import Customer
 from app.models.enums import CustomerType, UserRole
 from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import PaginatedResponse
 from app.schemas.customer import (
     CustomerCreate,
@@ -27,6 +32,9 @@ from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
+
+RequireCustomerActor = Annotated[User, Depends(require_perm(Perm.CUSTOMERS_VIEW))]
+RequireCustomerManage = Annotated[User, Depends(require_perm(Perm.CUSTOMERS_MANAGE))]
 
 
 def _resolve_scope(current_user: User) -> tuple[int | None, int | None]:

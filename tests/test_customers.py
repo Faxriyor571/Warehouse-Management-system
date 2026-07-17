@@ -74,6 +74,18 @@ def _seller(client: TestClient, ceo: dict[str, str], slug: str, username: str, s
     return _bearer(client, username, "Sell12345!", company_slug=slug)
 
 
+def _warehouse(client: TestClient, ceo: dict[str, str], slug: str, username: str) -> dict[str, str]:
+    """A company-wide Warehouse Employee — the only job function that can
+    record a Stock In under the ERP role redesign."""
+    resp = client.post(
+        "/api/v1/employees",
+        headers=ceo,
+        json={"username": username, "full_name": "Warehouse", "password": "Wh12345!", "employee_role": "warehouse"},
+    )
+    assert resp.status_code == 201, resp.text
+    return _bearer(client, username, "Wh12345!", company_slug=slug)
+
+
 def _product(client: TestClient, ceo: dict[str, str], sku: str) -> int:
     cat = client.post("/api/v1/categories", headers=ceo, json={"name": f"Cat-{sku}"}).json()["id"]
     unit = client.post("/api/v1/units", headers=ceo, json={"name": f"Unit-{sku}", "short_name": "u"}).json()["id"]
@@ -166,18 +178,20 @@ def test_sale_works_for_individual_customer_with_no_name(client: TestClient, db_
     ceo = _onboard(client, db_session, "cu-sale")
     store_id = _store(client, ceo)
     product_id = _product(client, ceo, "CUSALE")
+    warehouse = _warehouse(client, ceo, "cu-sale", "wh-cu-sale")
     client.post(
         "/api/v1/stock-in",
-        headers=ceo,
+        headers=warehouse,
         json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "10", "price": "10.00"}]},
     )
     customer_id = client.post(
         "/api/v1/customers", headers=ceo, json={"customer_type": "individual"}
     ).json()["id"]
+    cashier = _seller(client, ceo, "cu-sale", "cashier-cu-sale", store_id)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,
@@ -237,15 +251,17 @@ def test_sale_rejects_foreign_company_customer(client: TestClient, db_session: S
     ceo_b = _onboard(client, db_session, "cu-j2")
     store_a = _store(client, ceo_a)
     product_id = _product(client, ceo_a, "SKU-CUJ")
-    client.post("/api/v1/stock-in", headers=ceo_a, json={"store_id": store_a, "items": [{"product_id": product_id, "quantity": "10", "price": "10.00"}]})
+    warehouse_a = _warehouse(client, ceo_a, "cu-j1", "wh-cu-j1")
+    client.post("/api/v1/stock-in", headers=warehouse_a, json={"store_id": store_a, "items": [{"product_id": product_id, "quantity": "10", "price": "10.00"}]})
 
     customer_b = client.post(
         "/api/v1/customers", headers=ceo_b, json={"full_name": "Boshqa mijoz", "customer_type": "individual"}
     ).json()
+    cashier_a = _seller(client, ceo_a, "cu-j1", "cashier-cu-j1", store_a)
 
     resp = client.post(
         "/api/v1/sales",
-        headers=ceo_a,
+        headers=cashier_a,
         json={
             "store_id": store_a,
             "customer_id": customer_b["id"],
@@ -265,6 +281,8 @@ def test_seller_detail_history_filtered_to_own_store(client: TestClient, db_sess
     store_b = _store(client, ceo, "Store B")
     product_id = _product(client, ceo, "SKU-CUF")
     seller_a = _seller(client, ceo, "cu-f", "seller-cu-f-a", store_a)
+    cashier_b = _seller(client, ceo, "cu-f", "cashier-cu-f-b", store_b)
+    warehouse = _warehouse(client, ceo, "cu-f", "wh-cu-f")
     company_id = _company_id(db_session, "cu-f")
     cash_id = _cash_method_id(db_session, company_id)
 
@@ -273,17 +291,17 @@ def test_seller_detail_history_filtered_to_own_store(client: TestClient, db_sess
     ).json()["id"]
 
     for store_id in (store_a, store_b):
-        client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
+        client.post("/api/v1/stock-in", headers=warehouse, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
 
     # A sale in store A and a sale in store B, both for the same customer.
     client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=seller_a,
         json={"store_id": store_a, "customer_id": customer_id, "items": [{"product_id": product_id, "quantity": "1"}], "payments": [{"payment_method_id": cash_id, "amount": "15.00"}]},
     )
     client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier_b,
         json={"store_id": store_b, "customer_id": customer_id, "items": [{"product_id": product_id, "quantity": "1"}], "payments": [{"payment_method_id": cash_id, "amount": "15.00"}]},
     )
 
@@ -305,15 +323,17 @@ def test_deactivate_blocked_while_debt_outstanding(client: TestClient, db_sessio
     product_id = _product(client, ceo, "SKU-CUG")
     company_id = _company_id(db_session, "cu-g")
     cash_id = _cash_method_id(db_session, company_id)
-    client.post("/api/v1/stock-in", headers=ceo, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
+    warehouse = _warehouse(client, ceo, "cu-g", "wh-cu-g")
+    client.post("/api/v1/stock-in", headers=warehouse, json={"store_id": store_id, "items": [{"product_id": product_id, "quantity": "50", "price": "10.00"}]})
 
     customer_id = client.post(
         "/api/v1/customers", headers=ceo, json={"full_name": "Qarzdor", "customer_type": "individual"}
     ).json()["id"]
+    cashier = _seller(client, ceo, "cu-g", "cashier-cu-g", store_id)
 
     client.post(
         "/api/v1/sales",
-        headers=ceo,
+        headers=cashier,
         json={
             "store_id": store_id,
             "customer_id": customer_id,

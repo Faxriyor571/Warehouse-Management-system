@@ -1,21 +1,26 @@
 """Supplier endpoints. Company-scoped (DATABASE_DESIGN.md §3.10, "Partners"
 category, same pattern as Customers).
 
-Company-wide (no store scope): CEO and Seller share the same access tier
-(mirrors Customers pre-deactivate-split — no debt/lifecycle concept exists
-for Suppliers). The legacy single-tenant admin is admitted transitionally
-and operates in the NULL-company scope. Super Admin has no access.
+Company-wide (no store scope), gated by ``Perm.SUPPLIERS_MANAGE`` (a supplier
+is looked up/created inline while recording a Stock In — no debt/lifecycle
+concept exists for Suppliers, so there's no separate view/manage split). The
+legacy single-tenant admin bypasses via ``is_superuser`` inside
+``require_perm`` and operates in the NULL-company scope. Super Admin has no
+access.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import DbSession
-from app.auth.legacy_compat import RequireSupplierActor
+from app.auth.permissions import require_perm
 from app.crud.supplier import supplier as supplier_crud
 from app.models.enums import AuditAction
 from app.models.supplier import Supplier
 from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import Message, PaginatedResponse
 from app.schemas.supplier import SupplierCreate, SupplierOut, SupplierUpdate
 from app.services import audit_service
@@ -23,6 +28,8 @@ from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
+
+RequireSupplierActor = Annotated[User, Depends(require_perm(Perm.SUPPLIERS_MANAGE))]
 
 
 def _resolve_company(current_user: User) -> int | None:

@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { toastMutationError } from "@/lib/mutation";
 import { formatMoney, nowForDatetimeLocalInput } from "@/lib/formatters";
+import { isCompanyWide } from "@/lib/permissions";
 import { useAuth } from "@/providers/auth-provider";
 import { productService } from "@/services/product";
 import { stockInService } from "@/services/stock-in";
@@ -37,10 +38,11 @@ type StockInFormValues = z.infer<typeof stockInFormSchema>;
 export default function StockInNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  // Only an actual CEO must supply store_id (backend's _resolve_write_scope);
-  // the legacy single-tenant admin (role === null) resolves to (None, None)
-  // and never needs a store, unlike other modules' CEO-or-legacy-admin gate.
-  const isCeo = user?.role === "ceo";
+  // A company-wide identity (Warehouse Employee in practice — the only one
+  // who can actually submit this form) must supply store_id explicitly
+  // (backend's resolve_scope); the legacy single-tenant admin (role === null)
+  // resolves to (None, None) and never needs a store.
+  const isCeo = isCompanyWide(user);
   const queryClient = useQueryClient();
 
   const form = useForm<StockInFormValues>({
