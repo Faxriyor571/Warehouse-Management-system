@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query
 
 from app.auth.dependencies import DbSession, RequireCEOOrSeller
 from app.crud.product import product as product_crud

@@ -7,6 +7,7 @@ from app.auth.dependencies import CurrentUser, DbSession, require_super_admin
 from app.crud.company import company as company_crud
 from app.models.company import Company
 from app.models.enums import CompanyStatus
+from app.schemas.common import PaginatedResponse
 from app.schemas.company import (
     CompanyCreate,
     CompanyCreateResponse,
@@ -14,7 +15,6 @@ from app.schemas.company import (
     CompanyUpdate,
     SupportSessionToken,
 )
-from app.schemas.common import PaginatedResponse
 from app.services import company_service
 from app.utils.pagination import PageParams, make_meta
 

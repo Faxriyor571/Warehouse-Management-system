@@ -8,7 +8,6 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.crud.customer import customer as customer_crud
-from app.crud.debt import debt as debt_crud
 from app.crud.payment_method import payment_method as pm_crud
 from app.models.debt import Debt, DebtPayment
 from app.models.enums import AuditAction, DebtStatus, PaymentStatus

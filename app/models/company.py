@@ -5,8 +5,8 @@ are never physically deleted — lifecycle is managed via ``status``.
 """
 from __future__ import annotations
 
-from sqlalchemy import String
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
