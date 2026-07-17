@@ -1,53 +1,53 @@
-"""Product CRUD endpoints with search, filtering, barcode lookup and image upload."""
+"""Product catalogue endpoints (API_SPECIFICATION.md §6).
+
+Company-scoped, gated by ``Perm.PRODUCTS_VIEW``/``MANAGE``. The legacy
+single-tenant admin bypasses via ``is_superuser`` inside ``require_perm``.
+Scoping is uniform via ``current_user.company_id``.
+
+Per §6 this catalogue module deliberately does not define barcode-lookup or
+image-upload endpoints (SRS Future Roadmap), and per-store on-hand quantity is
+an Inventory-phase concern.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from typing import Annotated
 
-from app.auth.dependencies import CurrentUser, DbSession, ReqContext
+from fastapi import APIRouter, Depends, Query, status
+
+from app.auth.dependencies import DbSession
+from app.auth.permissions import require_perm
 from app.crud.product import product as product_crud
-from app.models.enums import AuditAction
 from app.models.product import Product
-from app.permissions.dependencies import require_permission
+from app.models.user import User
+from app.permissions.employee_matrix import Perm
 from app.schemas.common import Message, PaginatedResponse
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
-from app.services import audit_service, product_service
-from app.utils.files import save_image
+from app.services import product_service
+from app.utils.exceptions import NotFoundError
 from app.utils.pagination import PageParams, make_meta
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+RequireCatalogueRead = Annotated[User, Depends(require_perm(Perm.PRODUCTS_VIEW))]
+RequireCatalogueManage = Annotated[User, Depends(require_perm(Perm.PRODUCTS_MANAGE))]
 
 
 @router.get(
     "",
     response_model=PaginatedResponse[ProductOut],
-    dependencies=[Depends(require_permission("product.view"))],
     summary="Mahsulotlar ro'yxati (qidiruv, filtr, sahifalash)",
 )
 def list_products(
     db: DbSession,
+    current_user: RequireCatalogueRead,
     search: str | None = Query(default=None, description="Nomi / SKU / shtrix kod"),
     category_id: int | None = Query(default=None),
-    is_active: bool | None = Query(default=None),
-    low_stock: bool = Query(default=False, description="Faqat kam qolganlar"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
 ) -> PaginatedResponse[ProductOut]:
-    filters: list = []
-    if category_id is not None:
-        filters.append(Product.category_id == category_id)
-    if is_active is not None:
-        filters.append(Product.is_active.is_(is_active))
-    if low_stock:
-        filters.append(Product.quantity <= Product.min_quantity)
-
     params = PageParams(page=page, page_size=page_size)
-    items, total = product_crud.list(
-        db,
-        page_params=params,
-        search=search,
-        search_fields=[Product.name, Product.sku, Product.barcode],
-        filters=filters,
-        order_by=Product.name.asc(),
+    items, total = product_crud.list_for_company(
+        db, current_user.company_id, page_params=params, search=search, category_id=category_id
     )
     return PaginatedResponse[ProductOut](items=items, meta=make_meta(total, params))
 
@@ -56,90 +56,38 @@ def list_products(
     "",
     response_model=ProductOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_permission("product.manage"))],
     summary="Mahsulot qo'shish",
 )
 def create_product(
-    db: DbSession, ctx: ReqContext, current_user: CurrentUser, data: ProductCreate
+    db: DbSession, current_user: RequireCatalogueManage, data: ProductCreate
 ) -> Product:
-    return product_service.create_product(
-        db, data, user_id=current_user.id, ip_address=ctx.ip_address, user_agent=ctx.user_agent
-    )
+    return product_service.create_product(db, current_user.company_id, data)
 
 
-@router.get(
-    "/barcode/{barcode}",
-    response_model=ProductOut,
-    dependencies=[Depends(require_permission("product.view"))],
-    summary="Shtrix kod bo'yicha qidirish",
-)
-def get_product_by_barcode(db: DbSession, barcode: str) -> Product:
-    from app.utils.exceptions import NotFoundError
-
-    obj = product_crud.get_by_barcode(db, barcode)
+@router.get("/{product_id}", response_model=ProductOut, summary="Mahsulot ma'lumoti")
+def get_product(db: DbSession, current_user: RequireCatalogueRead, product_id: int) -> Product:
+    obj = product_crud.get_for_company(db, product_id, current_user.company_id)
     if obj is None:
-        raise NotFoundError(f"Shtrix kod '{barcode}' bo'yicha mahsulot topilmadi")
+        raise NotFoundError(f"Mahsulot (id={product_id}) topilmadi")
     return obj
 
 
-@router.get(
-    "/{product_id}",
-    response_model=ProductOut,
-    dependencies=[Depends(require_permission("product.view"))],
-    summary="Mahsulot ma'lumoti",
-)
-def get_product(db: DbSession, product_id: int) -> Product:
-    return product_crud.get_or_404(db, product_id)
-
-
-@router.put(
-    "/{product_id}",
-    response_model=ProductOut,
-    dependencies=[Depends(require_permission("product.manage"))],
-    summary="Mahsulotni yangilash",
-)
+@router.put("/{product_id}", response_model=ProductOut, summary="Mahsulotni yangilash")
 def update_product(
-    db: DbSession, ctx: ReqContext, current_user: CurrentUser, product_id: int, data: ProductUpdate
+    db: DbSession, current_user: RequireCatalogueManage, product_id: int, data: ProductUpdate
 ) -> Product:
-    obj = product_crud.get_or_404(db, product_id)
-    return product_service.update_product(
-        db, obj, data, user_id=current_user.id, ip_address=ctx.ip_address, user_agent=ctx.user_agent
-    )
+    obj = product_crud.get_for_company(db, product_id, current_user.company_id)
+    if obj is None:
+        raise NotFoundError(f"Mahsulot (id={product_id}) topilmadi")
+    return product_service.update_product(db, obj, current_user.company_id, data)
 
 
-@router.post(
-    "/{product_id}/image",
-    response_model=ProductOut,
-    dependencies=[Depends(require_permission("product.manage"))],
-    summary="Mahsulot rasmini yuklash",
-)
-def upload_product_image(
-    db: DbSession, product_id: int, file: UploadFile = File(...)
-) -> Product:
-    obj = product_crud.get_or_404(db, product_id)
-    relative_path = save_image(file, subdir="products")
-    return product_crud.update(db, obj, {"image": relative_path})
-
-
-@router.delete(
-    "/{product_id}",
-    response_model=Message,
-    dependencies=[Depends(require_permission("product.manage"))],
-    summary="Mahsulotni o'chirish",
-)
+@router.delete("/{product_id}", response_model=Message, summary="Mahsulotni o'chirish")
 def delete_product(
-    db: DbSession, ctx: ReqContext, current_user: CurrentUser, product_id: int
+    db: DbSession, current_user: RequireCatalogueManage, product_id: int
 ) -> Message:
-    obj = product_crud.get_or_404(db, product_id)
-    product_crud.remove(db, obj)
-    audit_service.log_action(
-        db,
-        action=AuditAction.DELETE,
-        user_id=current_user.id,
-        entity_type="product",
-        entity_id=product_id,
-        description=f"Mahsulot o'chirildi: {obj.sku} - {obj.name}",
-        ip_address=ctx.ip_address,
-        user_agent=ctx.user_agent,
-    )
+    obj = product_crud.get_for_company(db, product_id, current_user.company_id)
+    if obj is None:
+        raise NotFoundError(f"Mahsulot (id={product_id}) topilmadi")
+    product_service.delete_product(db, obj)
     return Message(detail="Mahsulot o'chirildi")

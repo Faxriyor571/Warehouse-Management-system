@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import security
 from app.config import settings
+from app.crud.payment_method import payment_method as pm_crud
 from app.database import Base, SessionLocal, engine
-from app.models.enums import PaymentMethodType, RoleName
-from app.models.payment_method import PaymentMethod
+from app.models.enums import RoleName, UserRole
 from app.models.role import Permission, Role
 from app.models.unit import Unit
 from app.models.user import User
@@ -29,23 +29,11 @@ from app.permissions.constants import (
 
 logger = logging.getLogger("wms.init")
 
-# Default payment methods: (name, type)
-_DEFAULT_PAYMENT_METHODS: list[tuple[str, PaymentMethodType]] = [
-    ("Naqd", PaymentMethodType.CASH),
-    ("Click", PaymentMethodType.CLICK),
-    ("Payme", PaymentMethodType.PAYME),
-    ("Bank", PaymentMethodType.BANK),
-    ("Qarz", PaymentMethodType.DEBT),
-]
-
-# Default units: (name, short_name)
+# Default units: (name, short_name). Kept deliberately minimal — this ERP's
+# stock is only ever measured in kilograms or sacks.
 _DEFAULT_UNITS: list[tuple[str, str]] = [
-    ("Dona", "dona"),
     ("Kilogramm", "kg"),
-    ("Litr", "l"),
-    ("Quti", "quti"),
     ("Qop", "qop"),
-    ("Metr", "m"),
 ]
 
 
@@ -111,11 +99,61 @@ def seed_admin(db: Session, roles: dict[str, Role]) -> None:
     logger.info("Boshlang'ich admin foydalanuvchi yaratildi: %s", settings.first_admin_username)
 
 
+def seed_super_admin(db: Session) -> None:
+    """Idempotently seed the first multi-tenant System Owner (``role=super_admin``).
+
+    Entirely independent of ``seed_admin`` above — this is a different account
+    in a different (newer) authorization model, not an alternate view of the
+    legacy admin. It is opt-in: a no-op unless both ``FIRST_SUPER_ADMIN_USERNAME``
+    and ``FIRST_SUPER_ADMIN_PASSWORD`` are explicitly set, and it never mutates
+    or promotes the legacy admin — mapping one to the other is called out in
+    DATABASE_DESIGN.md as a manual business decision, not something this app
+    decides on its own.
+    """
+    username = settings.first_super_admin_username
+    password = settings.first_super_admin_password
+    if not username or not password:
+        return
+
+    # Super Admins share the same globally-unique, NULL-company username scope
+    # as the legacy admin (``uq_users_null_company_username``), so look up by
+    # that scope rather than username alone to avoid colliding with a
+    # company-scoped user of the same name.
+    existing = db.execute(
+        select(User).where(User.username == username, User.company_id.is_(None))
+    ).scalar_one_or_none()
+    if existing is not None:
+        if existing.role != UserRole.SUPER_ADMIN:
+            logger.warning(
+                "FIRST_SUPER_ADMIN_USERNAME '%s' already belongs to another "
+                "platform-level user (e.g. the legacy admin) — skipping System "
+                "Owner seed rather than modifying it. Choose a different "
+                "FIRST_SUPER_ADMIN_USERNAME to bootstrap a System Owner.",
+                username,
+            )
+        return
+
+    super_admin = User(
+        username=username,
+        full_name=settings.first_super_admin_fullname,
+        hashed_password=security.hash_password(password),
+        role=UserRole.SUPER_ADMIN,
+        company_id=None,
+        store_id=None,
+        role_id=None,
+        is_superuser=False,
+        is_active=True,
+    )
+    db.add(super_admin)
+    db.commit()
+    logger.info("Birinchi System Owner (Super Admin) yaratildi: %s", username)
+
+
 def seed_payment_methods(db: Session) -> None:
-    existing = {pm.name for pm in db.execute(select(PaymentMethod)).scalars().all()}
-    for name, type_ in _DEFAULT_PAYMENT_METHODS:
-        if name not in existing:
-            db.add(PaymentMethod(name=name, type=type_, is_active=True, is_system=True))
+    """Seed the 5 system methods for the legacy single-tenant scope
+    (``company_id=None``). Tenant companies get their own copy at onboarding
+    (``company_service.create_company``)."""
+    pm_crud.seed_defaults_for_company(db, company_id=None)
     db.commit()
 
 
@@ -132,13 +170,28 @@ def seed_all(db: Session) -> None:
     permissions = seed_permissions(db)
     roles = seed_roles(db, permissions)
     seed_admin(db, roles)
+    seed_super_admin(db)
     seed_payment_methods(db)
     seed_units(db)
 
 
 def init_db() -> None:
-    """Entry point called on startup: create tables and seed baseline data."""
-    create_tables()
+    """Entry point called on startup: ensure schema exists and seed baseline data.
+
+    Schema management differs by environment:
+
+    - **Production** (``app_env=production``): the schema is owned by Alembic.
+      Run ``alembic upgrade head`` as a deploy step *before* starting the app;
+      startup does NOT auto-create tables (``create_all`` cannot ALTER existing
+      tables, so it would silently miss migrations). Only idempotent seeding
+      runs here.
+    - **Development / local**: ``create_all`` is kept for convenience so a fresh
+      checkout is runnable without invoking Alembic.
+
+    Seeding is idempotent in both cases.
+    """
+    if not settings.is_production:
+        create_tables()
     with SessionLocal() as db:
         seed_all(db)
-    logger.info("Ma'lumotlar bazasi tayyor (jadvallar va boshlang'ich ma'lumotlar)")
+    logger.info("Ma'lumotlar bazasi tayyor (sxema va boshlang'ich ma'lumotlar)")

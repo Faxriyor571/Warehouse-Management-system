@@ -6,7 +6,8 @@ from __future__ import annotations
 # "from __future__ import annotations" Pydantic v2 resolves annotations using
 # the class namespace as locals, so a field named "date" would shadow the date
 # type and break the optional-due-date annotation with a TypeError.
-from datetime import date as date_type, datetime
+from datetime import date as date_type
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,8 +29,13 @@ class StockOutItemCreate(BaseModel):
 
 
 class StockOutCreate(BaseModel):
-    """Payload to create a sale document."""
+    """Payload to create a sale document.
 
+    ``store_id`` is required for a CEO (the selling store) and omitted by a
+    Seller (resolved from the token).
+    """
+
+    store_id: int | None = None
     customer_id: int | None = None
     date: datetime | None = None
     discount: Decimal = Field(default=Decimal("0"), ge=0, description="Hujjat darajasidagi chegirma")
@@ -65,6 +71,7 @@ class StockOutOut(BaseModel):
 
     id: int
     reference: str
+    store_id: int | None = None
     customer_id: int | None = None
     created_by_id: int
     date: datetime

@@ -1,8 +1,9 @@
-"""Dashboard schemas."""
+"""Dashboard schemas (API_SPECIFICATION.md §13 — exact documented shape)."""
 from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -14,27 +15,17 @@ class TopProduct(BaseModel):
     revenue: Decimal
 
 
-class LowStockProduct(BaseModel):
-    product_id: int
-    name: str
-    sku: str
-    quantity: Decimal
-    min_quantity: Decimal
+class TopDebtor(BaseModel):
+    customer_id: int
+    full_name: str
+    remaining: Decimal
 
 
 class RecentOperation(BaseModel):
-    type: str  # "stock_in" | "stock_out"
+    type: Literal["sale", "stock_in"]
     reference: str
     date: datetime
     amount: Decimal
-    partner: str | None = None
-
-
-class DebtorBrief(BaseModel):
-    customer_id: int
-    full_name: str
-    phone: str | None = None
-    remaining: Decimal
 
 
 class ChartPoint(BaseModel):
@@ -43,21 +34,17 @@ class ChartPoint(BaseModel):
 
 
 class DashboardStats(BaseModel):
-    """Aggregated dashboard figures."""
+    """Role-based dashboard summary — same shape for CEO and Seller, data
+    scope differs (``scope``)."""
 
-    today_stock_in_total: Decimal
-    today_stock_out_total: Decimal
+    scope: Literal["store", "company"]
+    today_sales_total: Decimal
     today_sales_count: int
-    today_profit: Decimal
     month_revenue: Decimal
-    month_expense: Decimal
+    month_expenses: Decimal
     debtors_count: int
     debtors_total: Decimal
-    products_count: int
-    total_stock_value: Decimal
-    low_stock_count: int
-    low_stock_products: list[LowStockProduct]
     top_products: list[TopProduct]
-    debtors: list[DebtorBrief]
+    top_debtors: list[TopDebtor]
     recent_operations: list[RecentOperation]
     sales_chart: list[ChartPoint]

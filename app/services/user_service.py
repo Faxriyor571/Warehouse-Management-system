@@ -52,7 +52,7 @@ def update_user(db: Session, user: User, data: UserUpdate) -> User:
     payload = data.model_dump(exclude_unset=True)
 
     if "email" in payload and payload["email"]:
-        existing_email = user_crud.get_by_email(db, payload["email"])
+        existing_email = user_crud.get_by_email(db, payload["email"], company_id=user.company_id)
         if existing_email and existing_email.id != user.id:
             raise ConflictError(f"'{payload['email']}' email allaqachon band")
 
@@ -72,7 +72,7 @@ def update_profile(db: Session, user: User, data: ProfileUpdate) -> User:
     """Update the current user's own profile."""
     payload = data.model_dump(exclude_unset=True)
     if "email" in payload and payload["email"]:
-        existing_email = user_crud.get_by_email(db, payload["email"])
+        existing_email = user_crud.get_by_email(db, payload["email"], company_id=user.company_id)
         if existing_email and existing_email.id != user.id:
             raise ConflictError(f"'{payload['email']}' email allaqachon band")
     for key, value in payload.items():

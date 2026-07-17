@@ -7,6 +7,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.models.enums import CustomerType
+
 # Accepts digits, spaces, +, -, parentheses; 7..20 chars.
 _PHONE_RE = re.compile(r"^\+?[0-9\s\-()]{7,20}$")
 
@@ -20,7 +22,17 @@ def _validate_phone(value: str | None) -> str | None:
 
 
 class CustomerBase(BaseModel):
-    full_name: str = Field(min_length=2, max_length=200)
+    # Required for a Legal Entity (and the legacy /customers flow, which has
+    # no customer_type); optional for an Individual customer, per business
+    # rule (SRS, amended 2026-07-09) — a walk-in individual buyer should not
+    # be forced to have a name on file. Enforced conditionally in
+    # customer_service.create_customer, not by the schema, since the
+    # required-ness depends on customer_type.
+    full_name: str | None = Field(default=None, max_length=200)
+    # Required for the tenant (CEO/Seller) path (API_SPECIFICATION.md §10);
+    # left optional here so the legacy /customers flow keeps working
+    # unchanged — enforced per-actor in customer_service, not by the schema.
+    customer_type: CustomerType | None = None
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=255)
     passport: str | None = Field(default=None, max_length=30)
@@ -39,6 +51,7 @@ class CustomerCreate(CustomerBase):
 
 class CustomerUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=200)
+    customer_type: CustomerType | None = None
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=255)
     passport: str | None = Field(default=None, max_length=30)
@@ -55,6 +68,7 @@ class CustomerOut(CustomerBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_id: int | None = None
     created_at: datetime
 
 

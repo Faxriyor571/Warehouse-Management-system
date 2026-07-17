@@ -32,4 +32,5 @@ class SupplierOut(SupplierBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_id: int | None = None
     created_at: datetime

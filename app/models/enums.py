@@ -54,6 +54,77 @@ class AuditAction(str, enum.Enum):
     DELETE = "delete"
     STOCK_IN = "stock_in"
     STOCK_OUT = "stock_out"
+    SALES_RETURN = "sales_return"
     PAYMENT = "payment"
+    EXPENSE = "expense"
     PRICE_CHANGE = "price_change"
     LOGIN_FAILED = "login_failed"
+
+
+class UserRole(str, enum.Enum):
+    """Fixed multi-tenant role hierarchy (DATABASE_DESIGN.md §12).
+
+    This is the permanent, final name/shape for the role concept going
+    forward. It coexists with the legacy ``RoleName``/``Role`` RBAC system
+    during the incremental migration; ``RoleName`` is removed once every
+    module has moved over.
+    """
+
+    SUPER_ADMIN = "super_admin"
+    CEO = "ceo"
+    SELLER = "seller"
+
+
+class EmployeeRole(str, enum.Enum):
+    """Job function for a ``UserRole.SELLER`` employee.
+
+    Refines the fixed 3-tier ``UserRole`` hierarchy per DATABASE_DESIGN.md
+    §15's documented extensibility plan ("an optional overlay... layered on
+    top of the fixed role column") rather than growing ``UserRole`` itself.
+    Always ``None`` for CEO/SUPER_ADMIN. Adding a future job function (e.g. a
+    manager) means adding one value here plus one entry in
+    ``app/permissions/employee_matrix.py`` — nothing else changes.
+    """
+
+    CASHIER = "cashier"
+    WAREHOUSE = "warehouse"
+    ACCOUNTANT = "accountant"
+
+
+class CompanyStatus(str, enum.Enum):
+    """Lifecycle status of a company (tenant)."""
+
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+
+
+class CustomerType(str, enum.Enum):
+    """Individual vs. Legal Entity (SRS rule #17), used to gate rule #18
+    (legal-entity price override). Minimal addition for Sales — not a
+    Customers migration."""
+
+    INDIVIDUAL = "individual"
+    LEGAL_ENTITY = "legal_entity"
+
+
+class ExpenseType(str, enum.Enum):
+    """Fixed Version 1 expense classification (DATABASE_DESIGN.md §3.22)."""
+
+    FUEL = "fuel"
+    DRIVER = "driver"
+    LOADER = "loader"
+    OTHER = "other"
+
+
+class MovementType(str, enum.Enum):
+    """Kinds of inventory movement recorded in ``stock_movements`` (§3.9/§11).
+
+    ``sales_return`` and ``adjustment`` are defined now so the ledger is ready
+    for the Sales-return and future stock-adjustment features; only
+    ``stock_in`` and ``sale`` are produced by the writers migrated so far.
+    """
+
+    STOCK_IN = "stock_in"
+    SALE = "sale"
+    SALES_RETURN = "sales_return"
+    ADJUSTMENT = "adjustment"

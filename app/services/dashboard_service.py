@@ -1,27 +1,43 @@
-"""Dashboard aggregation logic."""
+"""Dashboard aggregation logic (API_SPECIFICATION.md §13).
+
+Role-based: a Seller's view is scoped to ``company_id`` + their own
+``store_id``; a CEO's (and the legacy admin's) view is scoped to
+``company_id`` only (company-wide / NULL-scope-wide). Reuses the existing
+Sales, Stock In, Debt and Expense models directly (read-only aggregation, no
+new business logic).
+"""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
 from app.models.debt import Debt
+from app.models.expense import Expense
 from app.models.product import Product
 from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut, StockOutItem
 from app.schemas.dashboard import (
     ChartPoint,
     DashboardStats,
-    DebtorBrief,
-    LowStockProduct,
     RecentOperation,
+    TopDebtor,
     TopProduct,
 )
+from app.utils.business_time import business_today, local_day_start_utc, to_local_date
 
 _ZERO = Decimal("0")
+
+
+def _scope_filters(model, company_id: int | None, store_id: int | None) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = []
+    filters.append(model.company_id.is_(None) if company_id is None else model.company_id == company_id)
+    if store_id is not None:
+        filters.append(model.store_id == store_id)
+    return filters
 
 
 def _scalar(db: Session, stmt) -> Decimal:
@@ -29,114 +45,59 @@ def _scalar(db: Session, stmt) -> Decimal:
     return Decimal(value) if value is not None else _ZERO
 
 
-def get_stats(db: Session) -> DashboardStats:
-    """Compute all dashboard figures in one call."""
-    today = datetime.now(timezone.utc).date()
+def get_stats(db: Session, *, company_id: int | None, store_id: int | None) -> DashboardStats:
+    """Compute all dashboard figures for one company (or one store within it)."""
+    # Business-local (UTC+5) calendar day/month — not the server's UTC clock.
+    # See app.utils.business_time for why: comparing sales against a
+    # UTC-midnight boundary attributed anything a UTC+5 shopkeeper recorded
+    # between local midnight and 05:00 to the wrong calendar day. Expressed
+    # as UTC range boundaries (not a SQL-side date()/timezone() truncation)
+    # so it stays portable to the SQLite engine the test suite runs on.
+    today = business_today()
     month_start = today.replace(day=1)
+    today_start = local_day_start_utc(today)
+    today_end = local_day_start_utc(today + timedelta(days=1))
+    month_start_utc = local_day_start_utc(month_start)
 
-    # --- Today's totals ---
-    today_in = _scalar(
-        db,
-        select(func.coalesce(func.sum(StockIn.total_amount), 0)).where(
-            func.date(StockIn.date) == today
-        ),
-    )
-    today_out = _scalar(
+    so_scope = _scope_filters(StockOut, company_id, store_id)
+    si_scope = _scope_filters(StockIn, company_id, store_id)
+    debt_scope = _scope_filters(Debt, company_id, store_id)
+    exp_scope = _scope_filters(Expense, company_id, store_id)
+
+    # --- Today's sales ---
+    today_sales_total = _scalar(
         db,
         select(func.coalesce(func.sum(StockOut.total_amount), 0)).where(
-            func.date(StockOut.date) == today
+            *so_scope, StockOut.date >= today_start, StockOut.date < today_end
         ),
     )
     today_sales_count = int(
         db.execute(
-            select(func.count(StockOut.id)).where(func.date(StockOut.date) == today)
+            select(func.count(StockOut.id)).where(*so_scope, StockOut.date >= today_start, StockOut.date < today_end)
         ).scalar_one()
     )
 
-    # --- Today's profit = revenue - cost of goods sold ---
-    profit_stmt = (
-        select(
-            func.coalesce(func.sum(StockOutItem.subtotal), 0)
-            - func.coalesce(func.sum(StockOutItem.quantity * Product.purchase_price), 0)
-        )
-        .select_from(StockOutItem)
-        .join(StockOut, StockOutItem.stock_out_id == StockOut.id)
-        .join(Product, StockOutItem.product_id == Product.id)
-        .where(func.date(StockOut.date) == today)
-    )
-    today_profit = _scalar(db, profit_stmt)
-
-    # --- Monthly revenue / expense ---
+    # --- Monthly revenue / expenses ---
     month_revenue = _scalar(
         db,
-        select(func.coalesce(func.sum(StockOut.total_amount), 0)).where(
-            func.date(StockOut.date) >= month_start
-        ),
+        select(func.coalesce(func.sum(StockOut.total_amount), 0)).where(*so_scope, StockOut.date >= month_start_utc),
     )
-    month_expense = _scalar(
+    month_expenses = _scalar(
         db,
-        select(func.coalesce(func.sum(StockIn.total_amount), 0)).where(
-            func.date(StockIn.date) >= month_start
-        ),
+        select(func.coalesce(func.sum(Expense.amount), 0)).where(*exp_scope, Expense.date >= month_start),
     )
 
     # --- Debtors ---
     debtors_total = _scalar(
-        db,
-        select(func.coalesce(func.sum(Debt.remaining_amount), 0)).where(
-            Debt.remaining_amount > 0
-        ),
+        db, select(func.coalesce(func.sum(Debt.remaining_amount), 0)).where(*debt_scope, Debt.remaining_amount > 0)
     )
     debtors_count = int(
         db.execute(
-            select(func.count(func.distinct(Debt.customer_id))).where(
-                Debt.remaining_amount > 0
-            )
+            select(func.count(func.distinct(Debt.customer_id))).where(*debt_scope, Debt.remaining_amount > 0)
         ).scalar_one()
     )
 
-    # --- Inventory ---
-    products_count = int(
-        db.execute(
-            select(func.count(Product.id)).where(
-                Product.deleted_at.is_(None), Product.is_active.is_(True)
-            )
-        ).scalar_one()
-    )
-    total_stock_value = _scalar(
-        db,
-        select(func.coalesce(func.sum(Product.quantity * Product.purchase_price), 0)).where(
-            Product.deleted_at.is_(None)
-        ),
-    )
-
-    # --- Low stock products ---
-    low_rows = (
-        db.execute(
-            select(Product)
-            .where(
-                Product.deleted_at.is_(None),
-                Product.is_active.is_(True),
-                Product.quantity <= Product.min_quantity,
-            )
-            .order_by(Product.quantity.asc())
-            .limit(10)
-        )
-        .scalars()
-        .all()
-    )
-    low_stock_products = [
-        LowStockProduct(
-            product_id=p.id,
-            name=p.name,
-            sku=p.sku,
-            quantity=p.quantity,
-            min_quantity=p.min_quantity,
-        )
-        for p in low_rows
-    ]
-
-    # --- Top products (by revenue, all time) ---
+    # --- Top products (by revenue, scoped) ---
     top_stmt = (
         select(
             Product.id,
@@ -145,111 +106,78 @@ def get_stats(db: Session) -> DashboardStats:
             func.coalesce(func.sum(StockOutItem.subtotal), 0).label("rev"),
         )
         .join(StockOutItem, StockOutItem.product_id == Product.id)
+        .join(StockOut, StockOutItem.stock_out_id == StockOut.id)
+        .where(*so_scope)
         .group_by(Product.id, Product.name)
         .order_by(func.sum(StockOutItem.subtotal).desc())
         .limit(5)
     )
     top_products = [
-        TopProduct(
-            product_id=row.id,
-            name=row.name,
-            quantity_sold=Decimal(row.qty),
-            revenue=Decimal(row.rev),
-        )
+        TopProduct(product_id=row.id, name=row.name, quantity_sold=Decimal(row.qty), revenue=Decimal(row.rev))
         for row in db.execute(top_stmt).all()
     ]
 
-    # --- Top debtors ---
+    # --- Top debtors (scoped) ---
     debtor_stmt = (
         select(
             Customer.id,
             Customer.full_name,
-            Customer.phone,
             func.coalesce(func.sum(Debt.remaining_amount), 0).label("rem"),
         )
         .join(Debt, Debt.customer_id == Customer.id)
-        .where(Debt.remaining_amount > 0)
-        .group_by(Customer.id, Customer.full_name, Customer.phone)
+        .where(*debt_scope, Debt.remaining_amount > 0)
+        .group_by(Customer.id, Customer.full_name)
         .order_by(func.sum(Debt.remaining_amount).desc())
         .limit(5)
     )
-    debtors = [
-        DebtorBrief(
-            customer_id=row.id,
-            full_name=row.full_name,
-            phone=row.phone,
-            remaining=Decimal(row.rem),
-        )
+    top_debtors = [
+        TopDebtor(customer_id=row.id, full_name=row.full_name, remaining=Decimal(row.rem))
         for row in db.execute(debtor_stmt).all()
     ]
 
-    # --- Recent operations (last 5 in + 5 out, merged) ---
-    recent_ins = (
-        db.execute(select(StockIn).order_by(StockIn.date.desc()).limit(5)).scalars().all()
-    )
-    recent_outs = (
-        db.execute(select(StockOut).order_by(StockOut.date.desc()).limit(5)).scalars().all()
-    )
-    recent_operations: list[RecentOperation] = []
-    for si in recent_ins:
-        recent_operations.append(
-            RecentOperation(
-                type="stock_in",
-                reference=si.reference,
-                date=si.date,
-                amount=si.total_amount,
-                partner=si.supplier.name if si.supplier else None,
-            )
-        )
-    for so in recent_outs:
-        recent_operations.append(
-            RecentOperation(
-                type="stock_out",
-                reference=so.reference,
-                date=so.date,
-                amount=so.total_amount,
-                partner=so.customer.full_name if so.customer else None,
-            )
-        )
+    # --- Recent operations (last 5 sales + 5 stock-ins, merged, scoped) ---
+    recent_ins = db.execute(select(StockIn).where(*si_scope).order_by(StockIn.date.desc()).limit(5)).scalars().all()
+    recent_outs = db.execute(select(StockOut).where(*so_scope).order_by(StockOut.date.desc()).limit(5)).scalars().all()
+    recent_operations = [
+        RecentOperation(type="stock_in", reference=si.reference, date=si.date, amount=si.total_amount)
+        for si in recent_ins
+    ] + [
+        RecentOperation(type="sale", reference=so.reference, date=so.date, amount=so.total_amount)
+        for so in recent_outs
+    ]
     recent_operations.sort(key=lambda op: op.date, reverse=True)
     recent_operations = recent_operations[:10]
 
-    # --- Sales chart (last 7 days) ---
+    # --- Sales chart (last 7 days, scoped) ---
+    # Bucketed in Python (by business-local date) rather than a SQL-side
+    # GROUP BY date() truncation, for the same portability reason as above —
+    # 7 days of a single company/store's sales is a small enough row count
+    # that this costs nothing meaningful.
     seven_days_ago = today - timedelta(days=6)
-    chart_stmt = (
-        select(
-            func.date(StockOut.date).label("d"),
-            func.coalesce(func.sum(StockOut.total_amount), 0).label("total"),
+    chart_rows = db.execute(
+        select(StockOut.date, StockOut.total_amount).where(
+            *so_scope, StockOut.date >= local_day_start_utc(seven_days_ago)
         )
-        .where(func.date(StockOut.date) >= seven_days_ago)
-        .group_by(func.date(StockOut.date))
-    )
+    ).all()
     chart_map: dict[str, Decimal] = {}
-    for row in db.execute(chart_stmt).all():
-        chart_map[str(row.d)] = Decimal(row.total)
+    for so_dt, amount in chart_rows:
+        key = str(to_local_date(so_dt))
+        chart_map[key] = chart_map.get(key, _ZERO) + Decimal(amount)
     sales_chart = [
-        ChartPoint(
-            label=str(seven_days_ago + timedelta(days=i)),
-            value=chart_map.get(str(seven_days_ago + timedelta(days=i)), _ZERO),
-        )
-        for i in range(7)
+        ChartPoint(label=str(d), value=chart_map.get(str(d), _ZERO))
+        for d in (seven_days_ago + timedelta(days=i) for i in range(7))
     ]
 
     return DashboardStats(
-        today_stock_in_total=today_in,
-        today_stock_out_total=today_out,
+        scope="store" if store_id is not None else "company",
+        today_sales_total=today_sales_total,
         today_sales_count=today_sales_count,
-        today_profit=today_profit,
         month_revenue=month_revenue,
-        month_expense=month_expense,
+        month_expenses=month_expenses,
         debtors_count=debtors_count,
         debtors_total=debtors_total,
-        products_count=products_count,
-        total_stock_value=total_stock_value,
-        low_stock_count=len(low_stock_products),
-        low_stock_products=low_stock_products,
         top_products=top_products,
-        debtors=debtors,
+        top_debtors=top_debtors,
         recent_operations=recent_operations,
         sales_chart=sales_chart,
     )

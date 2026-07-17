@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.models.enums import EmployeeRole, UserRole
 from app.schemas.role import RoleSummary
 
 
@@ -64,7 +65,24 @@ class UserOut(UserBase):
     id: int
     is_active: bool
     is_superuser: bool
-    role_id: int
-    role: RoleSummary | None = None
+    # Nullable: users created through the new Companies/Employees flows have
+    # no legacy role assignment at all.
+    role_id: int | None
+    # Legacy RBAC role assignment (being phased out incrementally).
+    legacy_role: RoleSummary | None = None
+    # Multi-tenant identity (DATABASE_DESIGN.md §3.3). Null until the user
+    # has been migrated to / created under the new Companies/Employees flow.
+    role: UserRole | None = None
+    # Job function within the SELLER tier (cashier/warehouse/accountant) —
+    # always None for CEO/SUPER_ADMIN. See EmployeeRole's docstring.
+    employee_role: EmployeeRole | None = None
+    company_id: int | None = None
+    store_id: int | None = None
     last_login_at: datetime | None = None
     created_at: datetime
+    # Set only when this identity is a System Owner's support session (see
+    # app.auth.support_session) — lets the frontend render the "acting as"
+    # banner from the existing GET /auth/me call, no extra request needed.
+    is_support_session: bool = False
+    support_company_id: int | None = None
+    support_company_name: str | None = None

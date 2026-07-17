@@ -1,7 +1,8 @@
 """Debt (Qarz) schemas."""
 from __future__ import annotations
 
-from datetime import date as date_type, datetime
+from datetime import date as date_type
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,6 +30,12 @@ class DebtPaymentCreate(BaseModel):
     note: str | None = None
 
 
+class DebtDueDateUpdate(BaseModel):
+    """Edit a debt's due date (API_SPECIFICATION.md §11)."""
+
+    due_date: date_type | None = None
+
+
 class DebtPaymentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,6 +52,8 @@ class DebtOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_id: int | None = None
+    store_id: int | None = None
     customer_id: int
     stock_out_id: int | None = None
     amount: Decimal

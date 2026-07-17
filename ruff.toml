@@ -1,0 +1,25 @@
+# Ruff configuration for the Warehouse Management System.
+# Idea adopted from the NexusWare reference project (which ships a ruff.toml and
+# a CI lint gate). Kept intentionally focused so the gate stays green and useful.
+
+target-version = "py313"
+line-length = 120
+
+# E/W = pycodestyle, F = pyflakes (undefined names, unused imports),
+# I = isort (import ordering), UP = pyupgrade (modern syntax), B = bugbear.
+lint.select = ["E", "F", "I"]
+lint.ignore = [
+    "E501",  # line length is handled by the formatter / line-length above
+]
+
+exclude = [
+    "alembic",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "__pycache__",
+]
+
+[lint.isort]
+known-first-party = ["app"]

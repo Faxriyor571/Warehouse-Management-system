@@ -11,10 +11,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 
 from app import __version__
 from app.config import settings
@@ -67,7 +69,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,10 +87,41 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-    """Return a 422 with a compact list of validation errors."""
+    """Return a 422 with a compact list of validation errors.
+
+    ``exc.errors()`` may contain non-JSON-serializable values in ``ctx`` — e.g.
+    the raw exception object when a schema validator raises ``ValueError`` — so
+    it is passed through ``jsonable_encoder`` (the same approach FastAPI's own
+    default handler uses) before serialization. Without this, such a validation
+    error would crash this handler and surface as a 500 instead of a 422. The
+    response shape is unchanged.
+    """
     return JSONResponse(
         status_code=422,
-        content={"detail": "Ma'lumotlar noto'g'ri", "errors": exc.errors()},
+        content={"detail": "Ma'lumotlar noto'g'ri", "errors": jsonable_encoder(exc.errors())},
+    )
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(_: Request, exc: IntegrityError) -> JSONResponse:
+    """A unique/foreign-key constraint reaching the DB layer directly.
+
+    Several services do a check-then-insert for uniqueness (category/unit
+    name, company slug, ...) and already return a clean 409 for the common
+    case. That check has an inherent race window: two requests creating the
+    same uniquely-named row within milliseconds of each other (a double
+    form-submit, or two users, same instant) can both pass the pre-check
+    before either commits, and the second hits the database's own
+    constraint. Without this handler that surfaced as a raw 500 with no
+    session cleanup. This is the safety net for that race — same honest
+    "already exists" response, just reached a different way. The session
+    is closed (and its aborted transaction discarded) in get_db()'s
+    `finally`, so no explicit rollback is needed here.
+    """
+    logger.warning("Integrity xatosi (bazadagi cheklov buzildi): %s", exc)
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Bu ma'lumot allaqachon mavjud yoki boshqa yozuv bilan ziddiyatda"},
     )
 
 

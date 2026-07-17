@@ -9,11 +9,13 @@ from __future__ import annotations
 # The date type is aliased so it can never be shadowed by a field/attribute
 # named ``date`` when SQLAlchemy / Pydantic evaluate string annotations under
 # ``from __future__ import annotations``.
-from datetime import date as date_type, datetime
+from datetime import date as date_type
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, Enum as SAEnum, ForeignKey, Numeric, Text, func
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, Text, func
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -35,6 +37,15 @@ class Debt(Base, TimestampMixin):
     __tablename__ = "debts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Denormalized scope (DATABASE_DESIGN.md §3.20), set by Sales when the debt
+    # is created; nullable for the legacy single-tenant flow. Not otherwise
+    # used — the Debts module itself is not migrated in this phase.
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    store_id: Mapped[int | None] = mapped_column(
+        ForeignKey("stores.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     customer_id: Mapped[int] = mapped_column(
         ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )

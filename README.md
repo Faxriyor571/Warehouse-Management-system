@@ -98,6 +98,15 @@ uvicorn app.main:app --reload
 **Boshlang'ich admin** (`.env` dan sozlanadi): `admin` / `Admin12345!`
 Kirgach parolni albatta o'zgartiring.
 
+**System Owner (ko'p-tenantli Super Admin)** — kompaniya yaratish/boshqarish
+uchun kerak, lekin yuqoridagi admin'dan butunlay boshqa hisob (`role=super_admin`,
+`is_superuser=false`). U avtomatik seed qilinmaydi va yuqoridagi admin'ga
+avtomatik aylantirilmaydi ham — bu ataylab shunday, chunki bu ikkisini bog'lash
+biznes qarori, mexanik amal emas. Uni yaratish uchun `.env`da
+`FIRST_SUPER_ADMIN_USERNAME` va `FIRST_SUPER_ADMIN_PASSWORD`ni to'ldirib
+ilovani qayta ishga tushiring — birinchi startdayoq shu hisob seed qilinadi
+(keyingi qayta ishga tushirishlar xavfsiz, takroriy yaratmaydi).
+
 ### 6. Testlar
 
 ```bash

@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": [
+        "/c",
+        "cd /d D:\\Projects\\Warehouse System\\frontend && npm run dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "frontend-preview",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": [
+        "/c",
+        "cd /d D:\\Projects\\Warehouse System\\frontend && npm run preview"
+      ],
+      "port": 4173
+    }
+  ]
+}

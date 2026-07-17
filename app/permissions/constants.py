@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from app.models.enums import RoleName
 
-
 # ---------------------------------------------------------------------------
 # Permission definitions: code -> (human name, group)
 # ---------------------------------------------------------------------------

@@ -18,8 +18,13 @@ class StockInItemCreate(BaseModel):
 
 
 class StockInCreate(BaseModel):
-    """Payload to create an inbound delivery document."""
+    """Payload to create an inbound delivery document.
 
+    ``store_id`` is required for a CEO (the receiving store) and omitted by a
+    Seller (resolved from the token).
+    """
+
+    store_id: int | None = None
     supplier_id: int | None = None
     date: datetime | None = None
     note: str | None = None
@@ -56,6 +61,7 @@ class StockInOut(BaseModel):
 
     id: int
     reference: str
+    store_id: int | None = None
     supplier_id: int | None = None
     created_by_id: int
     date: datetime

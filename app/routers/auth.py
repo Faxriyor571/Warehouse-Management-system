@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Form
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.auth.dependencies import CurrentUser, DbSession, ReqContext
 from app.schemas.common import Message
-from app.schemas.token import RefreshRequest, Token
+from app.schemas.token import LogoutRequest, RefreshRequest, Token
 from app.schemas.user import UserOut
 from app.services import auth_service
 
@@ -20,12 +20,20 @@ def login(
     db: DbSession,
     ctx: ReqContext,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    company_slug: Annotated[
+        str | None, Form(description="Kompaniya identifikatori (yangi ko'p tenantli foydalanuvchilar uchun)")
+    ] = None,
 ) -> Token:
-    """Authenticate with username/password and receive access + refresh tokens."""
+    """Authenticate with username/password and receive access + refresh tokens.
+
+    ``company_slug`` is an additional, optional form field: existing clients
+    that send only ``username``/``password`` are completely unaffected.
+    """
     _, token = auth_service.login(
         db,
         form_data.username,
         form_data.password,
+        company_slug=company_slug,
         ip_address=ctx.ip_address,
         user_agent=ctx.user_agent,
     )
@@ -34,15 +42,28 @@ def login(
 
 @router.post("/refresh", response_model=Token, summary="Access tokenni yangilash")
 def refresh(db: DbSession, body: RefreshRequest) -> Token:
-    """Exchange a valid refresh token for a new token pair."""
+    """Exchange a valid refresh token for a new, rotated token pair."""
     return auth_service.refresh_tokens(db, body.refresh_token)
 
 
 @router.post("/logout", response_model=Message, summary="Tizimdan chiqish")
-def logout(db: DbSession, current_user: CurrentUser, ctx: ReqContext) -> Message:
-    """Record a logout event (client should discard its tokens)."""
+def logout(
+    db: DbSession,
+    current_user: CurrentUser,
+    ctx: ReqContext,
+    body: LogoutRequest | None = None,
+) -> Message:
+    """Record a logout event and, if a refresh token is supplied, revoke it.
+
+    ``body`` is optional — existing clients calling this with no body keep
+    working exactly as before.
+    """
     auth_service.logout(
-        db, current_user, ip_address=ctx.ip_address, user_agent=ctx.user_agent
+        db,
+        current_user,
+        refresh_token=body.refresh_token if body else None,
+        ip_address=ctx.ip_address,
+        user_agent=ctx.user_agent,
     )
     return Message(detail="Tizimdan muvaffaqiyatli chiqdingiz")
 
